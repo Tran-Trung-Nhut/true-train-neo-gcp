@@ -8,10 +8,44 @@ import { grotesk, mono, panel } from "../shared/ui";
 export default function DeckIndex({ decks }: { decks: Deck[] }) {
   const openDeck = useStore((s) => s.openDeck);
   const openDeckModal = useStore((s) => s.openDeckModal);
+  const decksError = useStore((s) => s.decksError);
+  const loadDecks = useStore((s) => s.loadDecks);
 
   return (
     <div style={{ ...panel, overflow: "hidden" }}>
-      {decks.length === 0 && (
+      {/* A failed load must not masquerade as an empty account. */}
+      {decksError && (
+        <div
+          role="alert"
+          style={{
+            padding: "18px 22px",
+            borderBottom: decks.length ? "1px solid var(--border)" : "none",
+            background: "color-mix(in srgb, var(--bad) 8%, transparent)",
+          }}
+        >
+          <div style={{ ...mono(12.5, 600), color: "var(--bad)" }}>Could not load decks</div>
+          <div style={{ ...mono(12), color: "var(--muted)", marginTop: 6, lineHeight: 1.5 }}>
+            {decksError}
+          </div>
+          <button
+            onClick={() => void loadDecks()}
+            style={{
+              marginTop: 10,
+              padding: "7px 12px",
+              borderRadius: 8,
+              border: "1px solid var(--border)",
+              background: "var(--panel)",
+              color: "var(--text)",
+              ...mono(12, 600),
+              cursor: "pointer",
+            }}
+          >
+            retry
+          </button>
+        </div>
+      )}
+
+      {decks.length === 0 && !decksError && (
         <div style={{ padding: "26px 22px", textAlign: "center" }}>
           <div style={grotesk(17)}>No decks yet</div>
           <div style={{ ...mono(12), color: "var(--muted)", marginTop: 6 }}>

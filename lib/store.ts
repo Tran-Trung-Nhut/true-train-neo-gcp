@@ -67,6 +67,7 @@ export const useStore = create<AppState>()(
 
   decks: [],
   decksLoading: false,
+  decksError: "",
   deckWords: [],
   deckWordsLoading: false,
   deckWordsTotal: 0,
@@ -194,9 +195,17 @@ export const useStore = create<AppState>()(
     set({ decksLoading: true });
     try {
       const decks = await getDecksWithStats();
-      set({ decks, decksLoading: false });
-    } catch {
-      set({ decksLoading: false });
+      set({ decks, decksLoading: false, decksError: "" });
+    } catch (error) {
+      // A read failure must never render as "you have no decks" - that looks
+      // like data loss and hides the real cause (permissions, missing index,
+      // expired session).
+      console.error("loadDecks failed", error);
+      set({
+        decksLoading: false,
+        decksError:
+          "Could not load your decks. Your data is safe - this is a connection or server error.",
+      });
     }
   },
 
@@ -208,7 +217,9 @@ export const useStore = create<AppState>()(
         getPracticeStreakSummary(STATS_HISTORY_DAYS),
       ]);
       set({ stats, dailyCounts, practiceStreak });
-    } catch {}
+    } catch (error) {
+      console.error("loadStats failed", error);
+    }
   },
 
   loadSettings: async () => {
@@ -251,9 +262,15 @@ export const useStore = create<AppState>()(
         name: name.trim(),
         category: level === "General" ? "general" : "ielts_academic",
       });
-      get().notify(`Created the "${name.trim()}" deck.`);
-      await get().loadDecks();
-    } catch {}
+    } catch (error) {
+      // The write itself failed: never claim success.
+      console.error("createDeck failed", error);
+      get().notify("Could not create the deck. Check your connection and try again.", "error");
+      return;
+    }
+    // Only now is the save confirmed.
+    get().notify(`Created the "${name.trim()}" deck.`);
+    await get().loadDecks();
   },
 
   openDeckModal: () => set({ deckModalOpen: true, deckDraftName: "", deckDraftLevel: "Academic" }),

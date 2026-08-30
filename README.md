@@ -217,10 +217,26 @@ curl -s "$SERVICE_URL/api/health"
 Expected:
 
 ```json
-{"ready":true,"checks":{"firebaseWebConfig":true,"firebaseAdminCredentials":true,"geminiKeyResolved":true,"geminiKeySource":"secret-manager","geminiKeyLength":39}}
+{"ready":true,"checks":{"firebaseWebConfig":true,"firebaseAdminCredentials":true,"geminiKeyResolved":true,"geminiKeySource":"environment","geminiKeyLength":39}}
 ```
 
 The probe returns booleans and a length only — never any part of a secret. If `ready` is `false`, the failing check names the step to revisit.
+
+**`geminiKeySource` explained.** `--set-secrets` makes Cloud Run inject the secret's value as an ordinary environment variable, and the container cannot tell that apart from `--set-env-vars`. So:
+
+| Value | Meaning |
+|---|---|
+| `environment` | The key was read from `process.env`. **This is the expected value for the deploy command above** — the key still lives in Secret Manager and never enters the image. |
+| `secret-manager-api` | No env var was present, so the app called the Secret Manager API directly (rotation without redeploy). |
+| `none` | No key resolved — AI features will report as unavailable. |
+
+To confirm the key really is coming from Secret Manager rather than a plain env var:
+
+```bash
+gcloud run services describe "$SERVICE_NAME" --region "$REGION" \n  --format="yaml(spec.template.spec.containers[0].env)"
+```
+
+A `valueFrom.secretKeyRef` entry means Secret Manager; a bare `value:` means the key was pasted in as plaintext and should be moved.
 
 ---
 
@@ -374,7 +390,7 @@ If backticks give you trouble, run it as one long line — it is the same comman
 
 First deploy takes 5–10 minutes (Cloud Build installs dependencies and builds the image). Later deploys are faster.
 
-> Uploads are governed by `.gcloudignore`, which excludes `node_modules` and `.env`. **Do not delete that file** — this repo is not a git repository, so without it gcloud uploads the entire folder, including your secrets.
+> Uploads are governed by `.gcloudignore`, which excludes `node_modules` (**570 MB** in this project) and `.env`. **Do not delete that file** — this repo is not a git repository, so without it gcloud uploads the entire folder: a very slow deploy, and your Gemini key sent to Cloud Build.
 
 ### Step W8 — Label for challenge verification
 
@@ -405,7 +421,7 @@ Or, more idiomatically:
 Invoke-RestMethod "$SERVICE_URL/api/health" | ConvertTo-Json -Depth 5
 ```
 
-Expect `ready: true` with `geminiKeySource: "secret-manager"`.
+Expect `ready: true` with `geminiKeySource: "environment"` — see the explanation under Step 8; that value is correct when the key is mounted with `--set-secrets`.
 
 ### Step W10 — Running locally on Windows (optional)
 
@@ -429,7 +445,7 @@ For local AI, add `GEMINI_API_KEY=your-key` to `.env`. Deployed environments rea
 | `cannot be loaded because running scripts is disabled` | Execution policy. See Step W2. |
 | `Invoke-WebRequest : A parameter cannot be found that matches parameter name 's'` | You used `curl` instead of `curl.exe`. |
 | Gemini calls fail but the secret looks correct in the Console | The key was written with a BOM or trailing newline. Re-upload with `setup-secrets.ps1` and check the printed byte count. |
-| Deploy uploads for many minutes, or fails on size | `.gcloudignore` is missing or was deleted. Restore it — `node_modules` is being uploaded. |
+| Deploy uploads for many minutes, or fails on size | `.gcloudignore` is missing or was deleted. Restore it — 570 MB of `node_modules` is being uploaded. |
 | `auth/unauthorized-domain` in the browser | The Cloud Run domain is not in Firebase authorized domains. Step W9. |
 | `The query requires an index` | Index builds have not finished. Watch Firebase Console → Firestore → Indexes. |
 | `PERMISSION_DENIED` on Firestore from the server | Runtime service account is missing `roles/datastore.user`. Re-run `setup-secrets.ps1`. |
@@ -670,7 +686,7 @@ scripts/
   setup-secrets.ps1                            secrets + IAM (Windows PowerShell)
 ```
 
-> `.gcloudignore` keeps `node_modules` and `.env` out of the Cloud Build upload. It is required rather than optional here, because gcloud only falls back to `.gitignore` inside a git repository and this project is not one.
+> `.gcloudignore` keeps `node_modules` (570 MB) and `.env` out of the Cloud Build upload. It is required rather than optional here, because gcloud only falls back to `.gitignore` inside a git repository and this project is not one.
 
 ## Scripts
 

@@ -72,6 +72,7 @@ export interface AppState {
   activeDeckId: string;
   decks: Deck[];
   decksLoading: boolean;
+  decksError: string;
   deckWords: StudyCard[];
   deckWordsLoading: boolean;
   deckWordsTotal: number;
