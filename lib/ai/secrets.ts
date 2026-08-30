@@ -1,16 +1,8 @@
 import { SecretManagerServiceClient } from "@google-cloud/secret-manager";
 
-// Runtime secret resolution. No key is ever hardcoded, committed, or exposed to
-// the client — nothing here is prefixed NEXT_PUBLIC_, so Next.js cannot inline
-// it into the browser bundle.
-//
-// Resolution order:
-//   1. GEMINI_API_KEY in the environment — local development only.
-//   2. Google Cloud Secret Manager, read with the Cloud Run runtime service
-//      account's Application Default Credentials.
-//
-// The resolved value is cached in module scope, so Secret Manager is hit once
-// per container cold start rather than once per request.
+// Resolution order: GEMINI_API_KEY from the environment (Cloud Run secret
+// injection or local dev), then Secret Manager via ADC. Cached in module scope
+// so Secret Manager is read once per cold start.
 
 if (typeof window !== "undefined") {
   throw new Error("lib/ai/secrets must never be imported in client code");
@@ -42,8 +34,7 @@ export async function accessSecret(
   return response.payload?.data?.toString() ?? "";
 }
 
-// Guards against the classic misconfiguration where the key is exposed to the
-// browser by giving it a NEXT_PUBLIC_ prefix.
+// A NEXT_PUBLIC_ prefix would inline the key into the client bundle.
 function assertKeyNotPublic(): void {
   for (const name of Object.keys(process.env)) {
     if (name.startsWith("NEXT_PUBLIC_") && /GEMINI|GENAI|GOOGLE_AI/i.test(name)) {
@@ -65,7 +56,7 @@ async function resolveGeminiApiKey(): Promise<string> {
   try {
     return (await accessSecret(secretId)).trim();
   } catch (error) {
-    // Logged, not thrown: routes degrade to their non-AI path rather than 500.
+    // Routes degrade to their non-AI path rather than returning 500.
     console.error("gemini_secret_unavailable", error);
     return "";
   }
@@ -74,8 +65,7 @@ async function resolveGeminiApiKey(): Promise<string> {
 export function getGeminiApiKey(): Promise<string> {
   if (!cached) {
     cached = resolveGeminiApiKey().catch((error) => {
-      // Never cache a failure — the next request should retry.
-      cached = null;
+      cached = null; // never cache a failure
       throw error;
     });
   }

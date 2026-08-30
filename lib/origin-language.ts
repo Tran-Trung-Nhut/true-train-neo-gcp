@@ -1,6 +1,5 @@
-// The learner's own language. English word definitions are explained in this
-// language (the field formerly hardcoded as definition_vi), and step 3 passes
-// it to the AI prompts so explanations come back in the right language.
+// The learner's own language. English words are explained in this language,
+// and it is passed to the AI prompts so explanations come back in it.
 
 export const ORIGIN_LANGUAGES = [
   { code: "vi", label: "Tiếng Việt", english: "Vietnamese" },
@@ -38,6 +37,3 @@ export function originLanguageName(code: OriginLanguage): string {
   return ORIGIN_LANGUAGES.find((item) => item.code === code)?.english ?? "Vietnamese";
 }
 
-export function originLanguageLabel(code: OriginLanguage): string {
-  return ORIGIN_LANGUAGES.find((item) => item.code === code)?.label ?? code;
-}

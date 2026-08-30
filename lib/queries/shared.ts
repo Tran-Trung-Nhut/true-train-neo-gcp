@@ -20,9 +20,8 @@ export function deriveWordStatus(sm2?: Sm2State | null): WordStatus {
   return sm2.repetitions >= 3 ? "learned" : "learning";
 }
 
-// A brand-new word is written already due, so "never reviewed" and "due today"
-// share one dueDate predicate. reviewId stays null until the first review so
-// isCardDue() keeps behaving exactly as it did against the old review table.
+// reviewId stays null until the first review, which is what isCardDue() uses
+// to treat a never-reviewed word as due.
 export function mapStudyCard(id: string, row: WordDoc): StudyCard {
   const sm2 = row.sm2;
   return {

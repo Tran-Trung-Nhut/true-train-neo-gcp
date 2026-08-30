@@ -140,11 +140,9 @@ export async function updateDisplayName(displayName: string): Promise<string> {
 
   await updateProfile(user, { displayName: name });
 
-  // Best-effort only. Firebase refuses to mint a session cookie from an ID
-  // token whose auth_time is over 5 minutes old, so this succeeds right after
-  // sign-in and is expected to fail later. The profile write above is what
-  // matters; the name shown by the server shell catches up on the next
-  // sign-in, and step 2 makes the Firestore profile doc the source of truth.
+  // Best-effort: Firebase refuses to mint a session cookie from an ID token
+  // older than 5 minutes, so this succeeds just after sign-in and is expected
+  // to fail later. The profile write above is what matters.
   await establishServerSession(user).catch(() => {});
   return name;
 }

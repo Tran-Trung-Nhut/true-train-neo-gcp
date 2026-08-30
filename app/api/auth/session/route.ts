@@ -12,11 +12,8 @@ import {
   sessionCookieOptions,
 } from "@/lib/firebase/session";
 
-// Exchanges a freshly minted Firebase ID token for an HttpOnly session cookie.
-// The Admin SDK verifies the token (checkRevoked) before anything is issued, so
-// a forged or revoked token never produces a session.
-//
-// Node runtime is required: firebase-admin cannot run on the Edge runtime.
+// Exchanges a fresh Firebase ID token for an HttpOnly session cookie.
+// Node runtime required: firebase-admin cannot run on the Edge runtime.
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
@@ -45,15 +42,13 @@ export async function POST(request: Request) {
     await ensureProfile(idToken);
     return NextResponse.json({ ok: true });
   } catch (error) {
-    // Raw Firebase errors stay in the server log; the client sees a fixed code.
     console.error("session_mint_failed", error);
     return NextResponse.json({ error: "invalid_credentials" }, { status: 401 });
   }
 }
 
-// Creates or refreshes /users/{uid} on sign-in. Written with the Admin SDK
-// from the verified token, so the profile can never be seeded with an identity
-// the caller does not actually own. createdAt is preserved once set.
+// Built from the verified token, so the profile cannot be seeded with an
+// identity the caller does not own.
 async function ensureProfile(idToken: string): Promise<void> {
   try {
     const claims = await adminAuth().verifyIdToken(idToken, true);
@@ -75,8 +70,7 @@ async function ensureProfile(idToken: string): Promise<void> {
       { merge: true }
     );
   } catch (error) {
-    // A failed profile write must not block sign-in; the doc is created lazily
-    // by the settings writer as well.
+    // Must not block sign-in; the settings writer creates the doc lazily too.
     console.error("profile_bootstrap_failed", error);
   }
 }

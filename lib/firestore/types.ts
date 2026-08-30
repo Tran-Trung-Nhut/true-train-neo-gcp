@@ -1,23 +1,11 @@
-// Firestore document shapes.
-//
-// Two deliberate departures from the previous SQL schema, both infrastructure
-// rather than behaviour:
-//
-// 1. SM-2 state is embedded on the word document instead of living in a
-//    separate word_reviews table. The old relation was unique on
-//    (word_id, user_id) and every word already belonged to exactly one user,
-//    so it was always 1:1 within an owner. Embedding removes the join that all
-//    three Postgres RPCs existed to perform.
-//
-// 2. A new word is created already due (dueDate = today, repetitions = 0), so
-//    "has no review yet OR is due" collapses into a single dueDate <= today
-//    filter. Same selection as isCardDue, one indexable predicate.
+// SM-2 state is embedded on the word document (1:1 within an owner), and a new
+// word is created already due, so "unreviewed or due" is one dueDate predicate.
 
 export interface Sm2State {
   easeFactor: number;
   intervalDays: number;
   repetitions: number;
-  /** Local calendar day, YYYY-MM-DD. Compared as a string, which sorts correctly. */
+  /** Local calendar day, YYYY-MM-DD — sorts correctly as a string. */
   dueDate: string;
   lastReviewed: string | null;
   totalReviews: number;
@@ -29,7 +17,7 @@ export interface WordDoc {
   word: string;
   /** Lowercased headword, used for duplicate detection. */
   wordLower: string;
-  /** Lowercased tokens from word + part of speech + both definitions (Q3 option c). */
+  /** Lowercased tokens + prefixes, for substring-style search. */
   searchTokens: string[];
   phonetic: string;
   partOfSpeech: string;
@@ -67,7 +55,7 @@ export interface DailyStatsDoc {
   wordsReviewed: number;
   wordsLearned: number;
   streakDay: number;
-  /** Per-day review counter, so the heatmap never scans the whole log. */
+  /** Per-day counter so the heatmap never scans the whole log. */
   reviewCount: number;
   practiceCompleted: boolean;
   practiceMode: string;

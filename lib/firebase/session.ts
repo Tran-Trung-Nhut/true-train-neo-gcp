@@ -3,22 +3,14 @@ import type { DecodedIdToken } from "firebase-admin/auth";
 import { adminAuth } from "./admin";
 import { SESSION_COOKIE, SESSION_MAX_AGE_MS } from "./session.edge";
 
-// Server-side session handling.
-//
-// Firebase ID tokens live in IndexedDB and are unreachable from Server
-// Components and the Edge middleware. So on sign-in the client posts its ID
-// token once to /api/auth/session, which exchanges it (Admin SDK) for a
-// Firebase *session cookie*: HttpOnly, Secure, SameSite=Lax. Every server
-// gate verifies that cookie with checkRevoked, so disabling an account or
-// signing out kills access immediately.
-//
-// The cookie is named __session because that is the only cookie name Google
-// Front End / Firebase Hosting forwards through its CDN layer.
+// Firebase ID tokens live in IndexedDB, unreachable from Server Components.
+// The client posts its ID token to /api/auth/session once, which exchanges it
+// for an HttpOnly session cookie that every server gate verifies.
 
 export { SESSION_COOKIE, SESSION_MAX_AGE_MS } from "./session.edge";
 
-// createSessionCookie rejects ID tokens older than 5 minutes. We check first so
-// a stale token returns a clean 401 instead of an opaque Admin SDK error.
+// createSessionCookie rejects ID tokens older than 5 minutes; checking first
+// turns an opaque Admin SDK error into a clean 401.
 const MAX_ID_TOKEN_AGE_MS = 5 * 60 * 1000;
 
 export interface SessionUser {
@@ -60,8 +52,7 @@ export async function createSessionCookie(idToken: string): Promise<string> {
   return adminAuth().createSessionCookie(idToken, { expiresIn: SESSION_MAX_AGE_MS });
 }
 
-// Verifies the caller's session cookie. Returns null rather than throwing so
-// callers can decide between a redirect and a 401.
+// Returns null rather than throwing so callers choose between redirect and 401.
 export async function getSessionUser(): Promise<SessionUser | null> {
   const cookie = cookies().get(SESSION_COOKIE)?.value;
   if (!cookie) return null;
@@ -73,11 +64,6 @@ export async function getSessionUser(): Promise<SessionUser | null> {
   }
 }
 
-// Route-handler guard. Every authenticated API route derives the uid from here
-// and never from the request body, so a caller cannot act as another user.
-export async function requireSessionUser(): Promise<SessionUser | null> {
-  return getSessionUser();
-}
 
 export async function revokeSession(): Promise<void> {
   const cookie = cookies().get(SESSION_COOKIE)?.value;

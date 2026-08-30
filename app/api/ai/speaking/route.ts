@@ -71,9 +71,6 @@ export async function POST(request: Request) {
     });
   }
 
-  // The old route skipped rate limiting whenever the Host header looked like
-  // localhost. Host is caller-controlled, so that check is gone: the quota now
-  // applies uniformly.
   const limit = AI_LIMITS.speaking;
   const quota = await checkQuota(uid, "speaking", limit);
   if (!quota.allowed) {

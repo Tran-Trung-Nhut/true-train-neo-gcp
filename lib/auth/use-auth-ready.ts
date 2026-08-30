@@ -6,12 +6,9 @@ import { getFirebaseAuth } from "@/lib/firebase/client";
 
 export type AuthReadyState = "pending" | "ready" | "signed-out";
 
-// The server gate trusts the HttpOnly session cookie; the Firestore client SDK
-// trusts the browser's own Firebase session. They normally agree, but the local
-// session can be missing (cleared storage, a private window) while the cookie
-// is still valid — and every client query would then fail with an opaque
-// permission-denied. Waiting for the real auth state here turns that into a
-// clean redirect back to sign-in.
+// The server gate trusts the session cookie; the Firestore client SDK trusts
+// the browser session. When they diverge, redirect instead of letting every
+// client query fail with an opaque permission-denied.
 export function useAuthReady(): AuthReadyState {
   const [state, setState] = useState<AuthReadyState>("pending");
 

@@ -1,12 +1,8 @@
 import { GoogleGenAI } from "@google/genai";
 import { getGeminiApiKey } from "./secrets";
 
-// Server-only Gemini client with a resilient model fallback ladder.
-//
-// Never call generateContent with a single hardcoded model in a single try:
-// Flash tiers shed load, and a bare 503 becomes a dead button in the UI. Every
-// call walks the ladder below, so a transient upstream failure costs latency
-// instead of the user's work.
+// Server-only Gemini client. Every call walks the model ladder so a transient
+// upstream failure costs latency rather than the user's work.
 
 if (typeof window !== "undefined") {
   throw new Error("lib/ai/gemini must never be imported in client code");
@@ -19,9 +15,7 @@ export const MODEL_LADDER = [
   "gemini-3.7-flash",       // deep reasoning fallback
 ] as const;
 
-// Recoverable upstream conditions. 401/403 are deliberately absent: a bad key
-// or a disabled API fails identically on every model, so retrying the ladder
-// would just multiply the latency of a certain failure.
+// 401/403 are deliberately absent: they fail identically on every model.
 const RECOVERABLE_STATUS = new Set([429, 500, 503, 404]);
 
 const RECOVERABLE_PATTERNS = [
@@ -88,13 +82,11 @@ export interface GenerateOptions {
 
 export interface GenerateResult {
   text: string;
-  /** Which rung of the ladder actually answered — useful in logs. */
+  /** Which rung of the ladder answered. */
   model: string;
 }
 
-// The single entry point every AI route uses. Walks MODEL_LADDER, retrying on
-// recoverable upstream errors, and only surfaces an error once every model has
-// been tried.
+// Walks MODEL_LADDER, surfacing an error only after every model has been tried.
 export async function generateContentWithFallback(
   contents: GeminiTurn[],
   options: GenerateOptions = {}
@@ -117,7 +109,7 @@ export async function generateContentWithFallback(
 
       const text = response.text ?? "";
       if (!text.trim()) {
-        // An empty body (safety block, truncation) is worth one more rung.
+        // Empty body (safety block, truncation) is worth one more rung.
         lastError = new Error(`empty_response_from_${model}`);
         continue;
       }
@@ -136,7 +128,6 @@ export async function generateContentWithFallback(
   throw lastError instanceof Error ? lastError : new Error("gemini_unavailable");
 }
 
-// Convenience wrapper for plain text-in/text-out prompts.
 export async function generateText(
   prompt: string,
   options: GenerateOptions = {}
@@ -148,7 +139,6 @@ export async function generateText(
   return result.text;
 }
 
-// Splits a data: URL into the inlineData shape Gemini expects.
 export function dataUrlToPart(dataUrl: string): GeminiPart | null {
   const match = /^data:([^;,]+);base64,(.+)$/i.exec(dataUrl);
   if (!match) return null;

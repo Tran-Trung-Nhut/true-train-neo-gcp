@@ -3,13 +3,8 @@ import { readJsonBody, readString, requireUser } from "@/lib/api/guard";
 import { adminDb } from "@/lib/firebase/admin";
 import { decksPath, wordsPath } from "@/lib/firestore/paths";
 
-// Deleting a deck cascades to every word in it. The old schema faked this with
-// a soft-delete timestamp that nothing ever restored, so this now hard-deletes:
-// one predicate fewer on every read path, and no orphaned rows accruing cost.
-//
-// BulkWriter handles decks of any size (the 500-writes-per-batch limit is its
-// problem, not ours) and runs server-side so a large delete does not depend on
-// the browser staying open.
+// Cascades to every word in the deck. BulkWriter handles the 500-per-batch
+// limit and runs server-side so a large delete survives the browser closing.
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
@@ -27,9 +22,7 @@ export async function POST(request: Request) {
   try {
     const db = adminDb();
 
-    // Ownership is implied by the path — a caller can only ever address decks
-    // under their own verified uid — but confirm the deck exists so a bad id
-    // reports cleanly instead of silently "succeeding".
+    // Ownership is implied by the path; this only distinguishes a bad deck id.
     const deckRef = db.doc(`${decksPath(uid)}/${deckId}`);
     const deck = await deckRef.get();
     if (!deck.exists) {

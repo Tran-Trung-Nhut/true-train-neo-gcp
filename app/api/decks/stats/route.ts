@@ -4,12 +4,7 @@ import { adminDb } from "@/lib/firebase/admin";
 import { decksPath, wordsPath } from "@/lib/firestore/paths";
 import type { DeckDoc } from "@/lib/firestore/types";
 
-// Replaces the deck_stats Postgres RPC.
-//
-// Firestore has no GROUP BY, so per-deck totals are computed with count()
-// aggregation queries — billed one read per 1000 documents matched, which is
-// far cheaper than the full-table scan this replaces. All of it runs on the
-// server so the browser makes one request regardless of deck count.
+// Firestore has no GROUP BY, so per-deck totals use count() aggregations.
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
@@ -23,8 +18,7 @@ export async function GET(request: Request) {
   if (!guard.ok) return guard.response;
   const uid = guard.user.uid;
 
-  // The client sends its UTC offset so "due today" matches the user's calendar
-  // day rather than the server's.
+  // The client sends its UTC offset so "due today" uses its own calendar day.
   const url = new URL(request.url);
   const rawOffset = Number(url.searchParams.get("tzOffset"));
   const offsetMinutes = Number.isFinite(rawOffset) ? Math.max(-840, Math.min(840, rawOffset)) : 0;

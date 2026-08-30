@@ -6,16 +6,9 @@ import type { WordDoc } from "@/lib/firestore/types";
 import { mapStudyCard } from "@/lib/queries/shared";
 import type { StudyCard } from "@/lib/queries/types";
 
-// Replaces the study_due_cards Postgres RPC.
-//
-// Because a new word is written already due, "never reviewed OR due" is the
-// single predicate sm2.dueDate <= today — the join the RPC existed for is gone.
-//
 // Firestore requires the first orderBy to be the inequality field, so due cards
-// always come back in dueDate order. For the "alpha" and "random" modes we pull
-// a bounded pool of the most-due cards and reorder in memory. That is exact
-// whenever a deck has DUE_POOL_SIZE or fewer cards due, and for larger decks it
-// draws from the 200 most overdue — which is the right bias for study anyway.
+// always arrive in dueDate order. The alpha and random modes reorder a bounded
+// pool of the most-due cards in memory.
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
@@ -77,8 +70,8 @@ export async function GET(request: Request) {
 
     const sessionCards = due.slice(0, sessionSize);
 
-    // deckCards must always contain the session cards so quizPick can resolve
-    // any answered question by id, exactly as the old query guaranteed.
+    // deckCards must contain the session cards so quizPick can resolve any
+    // answered question by id.
     const byId = new Map<string, StudyCard>();
     for (const card of sessionCards) byId.set(card.id, card);
     for (const doc of poolSnapshot.docs) {

@@ -1,6 +1,5 @@
-// Open-redirect guard. Only same-origin relative paths are ever honoured for a
-// post-sign-in redirect: no absolute URLs, no protocol-relative "//evil.com",
-// no backslash tricks.
+// Only same-origin relative paths are honoured: no absolute URLs, no
+// protocol-relative "//host", no backslash tricks.
 export function safeNextPath(value: unknown, fallback = "/"): string {
   if (typeof value !== "string" || value.length === 0 || value.length > 512) {
     return fallback;

@@ -3,22 +3,16 @@ import { adminAuth, adminDb } from "@/lib/firebase/admin";
 import { readFirebaseWebConfigFromEnv } from "@/lib/firebase/config";
 import { getGeminiApiKey } from "@/lib/ai/secrets";
 
-// Deployment readiness probe and diagnostic.
-//
-// Answers "is this container correctly wired?" without ever revealing what it
-// is wired to: every field is a boolean, a length, an error CODE, or the
-// project id (which the browser already receives in the Firebase web config).
-// No secret value and no fragment of one. Safe to curl against a live URL.
+// Readiness probe. Every field is a boolean, a length, an error code, or the
+// project id, so this is safe to curl against a live URL.
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// Firestore/gRPC surface an error code; anything else is reported generically
-// so an unexpected message can never leak internals.
+// Reported generically so an unexpected message cannot leak internals.
 function errorCode(error: unknown): string {
   const code = (error as { code?: unknown })?.code;
   if (typeof code === "string") return code;
   if (typeof code === "number") {
-    // gRPC status codes that matter for diagnosis.
     const map: Record<number, string> = {
       5: "NOT_FOUND",
       7: "PERMISSION_DENIED",
@@ -47,7 +41,7 @@ function adminProjectId(): string {
 export async function GET() {
   const webConfig = readFirebaseWebConfigFromEnv();
 
-  // Application Default Credentials: exercised, not merely assumed present.
+  // Exercised rather than assumed present.
   let adminCredentials = false;
   let adminError = "";
   try {
@@ -58,9 +52,8 @@ export async function GET() {
     console.error("health_admin_credentials_failed", error);
   }
 
-  // Firestore is a SEPARATE permission from Firebase Auth (roles/datastore.user
-  // vs roles/firebaseauth.admin). Checking only Auth hides the most common
-  // cause of "writes work but reads return nothing".
+  // Separate permission from Firebase Auth: roles/datastore.user vs
+  // roles/firebaseauth.admin. Checking only Auth hides read failures.
   let firestoreRead = false;
   let firestoreError = "";
   try {
@@ -71,9 +64,7 @@ export async function GET() {
     console.error("health_firestore_read_failed", error);
   }
 
-  // Exercises the exact composite-index shapes /api/decks/stats and
-  // /api/decks/words depend on. A FAILED_PRECONDITION here means the indexes
-  // have not finished building.
+  // FAILED_PRECONDITION here means the composite indexes are still building.
   let firestoreIndexes = false;
   let indexError = "";
   if (firestoreRead) {
@@ -91,12 +82,8 @@ export async function GET() {
     }
   }
 
-  // Describes the mechanism this process used, not the value's ultimate origin.
-  // Cloud Run injects `--set-secrets` values as ordinary environment variables
-  // and gives the container no way to distinguish them from `--set-env-vars`,
-  // so "environment" is the correct and expected answer for BOTH. It does not
-  // mean the key was hardcoded: with --set-secrets the value still lives in
-  // Secret Manager, is IAM-controlled, and never enters the image.
+  // Cloud Run injects --set-secrets values as ordinary environment variables,
+  // so "environment" is expected for both that and --set-env-vars.
   let geminiKeyLength = 0;
   let geminiSource: "none" | "environment" | "secret-manager-api" = "none";
   try {
@@ -119,8 +106,7 @@ export async function GET() {
     geminiKeyResolved: geminiKeyLength > 0,
     geminiKeySource: geminiSource,
     geminiKeyLength,
-    // Client and server MUST agree on the project, or writes and reads land in
-    // different databases and the app looks empty despite successful saves.
+    // A mismatch sends writes and reads to different databases.
     webConfigProjectId: webConfig?.projectId ?? "",
     adminProjectId: adminProjectId(),
     projectIdsMatch: (webConfig?.projectId ?? "") === adminProjectId(),

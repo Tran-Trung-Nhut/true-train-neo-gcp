@@ -1,11 +1,8 @@
 import { NextResponse } from "next/server";
 import { getSessionUser, type SessionUser } from "@/lib/firebase/session";
 
-// Standard authorisation boundary for every data/AI route.
-//
 // The uid always comes from the verified session cookie, never from the
-// request body or a query parameter, so a caller cannot address another
-// user's documents by editing the payload (OWASP A01).
+// request body, so a caller cannot address another account.
 
 export type Guarded =
   | { ok: true; user: SessionUser }
@@ -22,8 +19,7 @@ export async function requireUser(): Promise<Guarded> {
   return { ok: true, user };
 }
 
-// Null-safe body reader. A missing or malformed payload becomes an empty
-// object rather than an unhandled throw, per the payload-ingestion directive.
+// A missing or malformed payload becomes {} rather than an unhandled throw.
 export async function readJsonBody(request: Request): Promise<Record<string, unknown>> {
   const raw = await request.json().catch(() => null);
   return raw && typeof raw === "object" && !Array.isArray(raw)

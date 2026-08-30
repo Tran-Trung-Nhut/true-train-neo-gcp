@@ -599,9 +599,8 @@ export const useStore = create<AppState>()(
     if (!text || state.aiTyping) return;
     const history: ChatMsg[] = [...state.chat, { role: "user", text }];
 
-    // The input buffer is NOT cleared here. Per the persistence directive the
-    // user's text is only discarded once the request has actually settled, so
-    // a failed send leaves it in the box to retry rather than losing it.
+    // The input is cleared only once the request settles, so a failed send
+    // leaves the text in the box to retry.
     set({ chat: history, aiTyping: true, chatError: "" });
 
     try {
@@ -637,8 +636,7 @@ export const useStore = create<AppState>()(
         aiTyping: false,
       }));
     } catch {
-      // Roll the pending turn back out of the transcript and keep the text in
-      // the input so the user can press send again.
+      // Roll the pending turn back out and keep the text for a retry.
       set((s) => ({
         chat: s.chat.slice(0, -1),
         chatError: "Could not reach the AI. Your message was kept — try again.",

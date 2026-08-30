@@ -1,12 +1,6 @@
-// Search tokens — Q3 option (c).
-//
-// Postgres backed vocabulary search with ILIKE '%term%' across four columns.
-// Firestore has no substring operator, so each word document carries a
-// precomputed token array and search becomes an array-contains lookup.
-//
-// Tokens include prefixes of every word (2..12 chars) so typing "sust" still
-// finds "sustainable" — the practical behaviour users expect from the old
-// substring match. Infix matches ("tain") are the one thing not reproduced.
+// Firestore has no substring operator, so each word carries a precomputed
+// token array and search becomes an array-contains lookup. Tokens include
+// 2-12 char prefixes, so "sust" finds "sustainable". Infix matches do not.
 
 const MAX_TOKENS = 200;
 const MIN_PREFIX = 2;
@@ -53,8 +47,8 @@ export function buildSearchTokens(input: {
   return [...tokens];
 }
 
-// A query can carry only one array-contains filter, so the longest term drives
-// the index lookup and any remaining terms are applied to the returned page.
+// Only one array-contains filter is allowed, so the longest term drives the
+// index lookup and the rest filter the returned page.
 export function parseSearchTerms(search?: string): {
   primary: string;
   rest: string[];

@@ -7,20 +7,15 @@ import {
 import { getAuth, type Auth } from "firebase-admin/auth";
 import { getFirestore, type Firestore } from "firebase-admin/firestore";
 
-// Server-only Firebase Admin singleton.
-//
-// Credentials come from Application Default Credentials — the Cloud Run runtime
-// service account in production, `gcloud auth application-default login`
-// locally. No service-account JSON is ever read from disk or from an env var,
-// per the zero-hardcoding directive.
+// Credentials come from Application Default Credentials only: the Cloud Run
+// runtime service account in production, gcloud ADC locally.
 
 if (typeof window !== "undefined") {
   throw new Error("firebase-admin must never be imported in client code");
 }
 
-// Enforces the zero-hardcoding directive at runtime. Embedding service-account
-// key material in an environment variable is the exact pattern Secret Manager
-// exists to replace, so it fails loudly rather than working quietly.
+// Service-account key material in an env var is the pattern Secret Manager
+// replaces, so it fails loudly rather than working quietly.
 const FORBIDDEN_CREDENTIAL_VARS = [
   "FIREBASE_SERVICE_ACCOUNT",
   "FIREBASE_SERVICE_ACCOUNT_KEY",

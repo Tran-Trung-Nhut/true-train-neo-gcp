@@ -1,6 +1,5 @@
-// Every path is rooted at the owner's uid. Nothing in this app is stored
-// outside /users/{uid}, which is what makes the single ownership predicate in
-// firestore.rules sufficient.
+// Everything is rooted at /users/{uid}, which is what lets firestore.rules use
+// a single ownership predicate.
 
 export const userPath = (uid: string) => `users/${uid}`;
 export const decksPath = (uid: string) => `users/${uid}/decks`;

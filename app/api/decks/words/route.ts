@@ -7,12 +7,7 @@ import type { WordDoc } from "@/lib/firestore/types";
 import { mapStudyCard } from "@/lib/queries/shared";
 import { VOCABULARY_PAGE_SIZE } from "@/lib/vocabulary-config";
 
-// Replaces the deck_vocabulary_page Postgres RPC.
-//
-// The vocabulary UI uses numbered pages, and offset() exists only on the Admin
-// SDK, so this pagination has to run server-side. Status is a range/equality
-// filter on the embedded sm2 state — no join, because the SM-2 data lives on
-// the word document.
+// Numbered-page pagination needs offset(), which only the Admin SDK provides.
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
@@ -40,8 +35,7 @@ export async function GET(request: Request) {
     const db = adminDb();
     let query = db.collection(wordsPath(uid)).where("deckId", "==", deckId);
 
-    // Only one array-contains filter is allowed per query; the remaining terms
-    // are applied to the returned page below.
+    // Only one array-contains filter per query; the rest filter the page.
     if (primary) query = query.where("searchTokens", "array-contains", primary);
 
     if (status === "new") {
@@ -57,8 +51,7 @@ export async function GET(request: Request) {
     const totalPages = Math.max(1, Math.ceil(total / pageSize));
     const page = Math.min(requestedPage, totalPages);
 
-    // "learned" is an open-ended range, so Firestore requires that field to be
-    // the first ordering key. Every other case can order by creation time.
+    // An open-ended range must be the first ordering key.
     const ordered =
       status === "learned"
         ? query.orderBy("sm2.repetitions").orderBy("createdAt")

@@ -1,19 +1,11 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { SESSION_COOKIE } from "@/lib/firebase/session.edge";
 
-// Cheap first-pass gate only.
+// Presence check only: firebase-admin cannot run on the Edge runtime, so real
+// verification happens in app/page.tsx and every API route. A forged cookie
+// passes here and is rejected there.
 //
-// Middleware runs on the Edge runtime, where firebase-admin (and therefore
-// real signature verification) cannot run. So this checks *presence* of the
-// session cookie to avoid rendering the app shell for obvious anonymous
-// traffic, and nothing more. Authorisation is enforced where it actually
-// counts, on the Node runtime:
-//   - app/page.tsx          verifySessionCookie(checkRevoked) before rendering
-//   - every /api/* handler  requireSessionUser() before touching data
-// A forged cookie gets past this check and is rejected there.
-
-// /api/health must stay reachable without a session: Cloud Run startup and
-// liveness probes send no cookies. It returns booleans only, never a secret.
+// /api/health stays public because Cloud Run probes send no cookies.
 const PUBLIC_PREFIXES = ["/login", "/auth", "/api/auth", "/api/health"];
 
 function isPublicPath(path: string): boolean {
