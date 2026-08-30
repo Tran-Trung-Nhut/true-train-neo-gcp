@@ -1,0 +1,72 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "words",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "deckId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "words",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "deckId", "order": "ASCENDING" },
+        { "fieldPath": "sm2.dueDate", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "words",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "deckId", "order": "ASCENDING" },
+        { "fieldPath": "sm2.repetitions", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "words",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "deckId", "order": "ASCENDING" },
+        { "fieldPath": "searchTokens", "arrayConfig": "CONTAINS" },
+        { "fieldPath": "createdAt", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "words",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "deckId", "order": "ASCENDING" },
+        { "fieldPath": "searchTokens", "arrayConfig": "CONTAINS" },
+        { "fieldPath": "sm2.repetitions", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "words",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "wordLower", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "reviewLogs",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "reviewLogs",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "rating", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

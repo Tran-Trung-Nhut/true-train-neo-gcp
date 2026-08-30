@@ -1,0 +1,33 @@
+# Never ship local secrets or credentials into an image layer.
+.env
+.env.*
+*.pem
+*.key
+*-key.json
+*service-account*.json
+application_default_credentials.json
+
+# Build artefacts and local installs — the image builds these itself.
+node_modules
+.next
+out
+build
+*.tsbuildinfo
+
+# Repo and tooling noise.
+.git
+.gitignore
+.github
+.vscode
+.idea
+.claude
+CLAUDE.md
+README.md
+npm-debug.log*
+.DS_Store
+
+# Not needed at runtime.
+scripts
+firebase.json
+firestore.rules
+firestore.indexes.json

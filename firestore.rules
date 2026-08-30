@@ -1,0 +1,81 @@
+rules_version = '2';
+
+// TRUETRAINNEO — owner-bound Firestore rules.
+//
+// Every document in the app lives under /users/{userId}/..., so a single
+// ownership predicate covers the entire tree. There is no public collection
+// and no `if true` anywhere: an unauthenticated request matches nothing.
+//
+// aiUsage is deliberately read-only for clients. It backs the per-day AI quota,
+// so if the browser could write it a user could reset their own counter and
+// burn unlimited paid model calls. Only the Admin SDK (which bypasses rules)
+// increments it, from an authenticated server route.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    function isNonEmptyString(value, maxLen) {
+      return value is string && value.size() > 0 && value.size() <= maxLen;
+    }
+
+    // ── Profile ────────────────────────────────────────────────────────
+    match /users/{userId} {
+      allow read: if isOwner(userId);
+      allow create, update: if isOwner(userId)
+        && request.resource.data.keys().hasOnly(
+             ['displayName', 'email', 'photoURL', 'originLanguage', 'createdAt', 'updatedAt']
+           );
+      allow delete: if false;
+
+      // ── Decks ────────────────────────────────────────────────────────
+      match /decks/{deckId} {
+        allow read, delete: if isOwner(userId);
+        allow create, update: if isOwner(userId)
+          && isNonEmptyString(request.resource.data.name, 120);
+      }
+
+      // ── Words (SM-2 state is embedded on the document) ────────────────
+      match /words/{wordId} {
+        allow read, delete: if isOwner(userId);
+        allow create, update: if isOwner(userId)
+          && isNonEmptyString(request.resource.data.word, 200)
+          && isNonEmptyString(request.resource.data.deckId, 128)
+          && request.resource.data.definition is string
+          && request.resource.data.sm2 is map;
+      }
+
+      // ── Review history (append-only from the client) ──────────────────
+      match /reviewLogs/{logId} {
+        allow read, create: if isOwner(userId);
+        allow update, delete: if false;
+      }
+
+      // ── Daily practice stats / streak ─────────────────────────────────
+      match /dailyStats/{dayId} {
+        allow read, create, update: if isOwner(userId);
+        allow delete: if false;
+      }
+
+      // ── Preferences ──────────────────────────────────────────────────
+      match /settings/{docId} {
+        allow read, create, update: if isOwner(userId);
+        allow delete: if false;
+      }
+
+      // ── AI quota: readable by the owner, writable only server-side ────
+      match /aiUsage/{usageId} {
+        allow read: if isOwner(userId);
+        allow write: if false;
+      }
+    }
+
+    // Anything not matched above is denied.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

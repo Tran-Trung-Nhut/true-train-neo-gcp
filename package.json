@@ -1,0 +1,33 @@
+{
+  "name": "truetrainneo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "TRUETRAINNEO — AI-powered IELTS vocabulary app",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@google-cloud/secret-manager": "^7.0.0",
+    "@google/genai": "^2.19.0",
+    "firebase": "^12.18.0",
+    "firebase-admin": "^14.3.0",
+    "lucide-react": "0.408.0",
+    "next": "^14.2.33",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "zustand": "4.5.4"
+  },
+  "devDependencies": {
+    "@types/node": "20.14.10",
+    "@types/react": "18.3.3",
+    "@types/react-dom": "18.3.0",
+    "autoprefixer": "10.4.19",
+    "postcss": "8.4.39",
+    "tailwindcss": "3.4.6",
+    "typescript": "5.5.3"
+  }
+}
