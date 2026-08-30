@@ -40,6 +40,8 @@ sign-in → ID token → POST /api/auth/session → Admin SDK verifies → __ses
 
 Everything below assumes the [gcloud CLI](https://cloud.google.com/sdk/docs/install) and [Firebase CLI](https://firebase.google.com/docs/cli) are installed.
 
+> **On Windows?** The commands in this section are bash. PowerShell needs different syntax in several places, two of which fail *silently*. Jump to **[Deploying from Windows](#deploying-from-windows)** for a complete PowerShell walkthrough.
+
 ### Step 1 — Project and APIs
 
 ```bash
@@ -219,6 +221,221 @@ Expected:
 ```
 
 The probe returns booleans and a length only — never any part of a secret. If `ready` is `false`, the failing check names the step to revisit.
+
+---
+
+## Deploying from Windows
+
+A complete, self-contained walkthrough for Windows 10/11. You do **not** need WSL, and you do not need Docker — Cloud Build compiles the image in the cloud.
+
+### Which shell
+
+Either works, but pick one and stay in it:
+
+| Shell | When to use |
+|---|---|
+| **PowerShell** | Recommended. Follow the numbered steps below. |
+| **Git Bash** | If you prefer the bash commands from the section above, they run **as-is** in Git Bash. Only `./scripts/setup-secrets.sh` requires it. |
+
+Do **not** paste the bash commands into PowerShell. `export`, `\` line continuations and `$(…)` command substitution behave differently or fail.
+
+### Two Windows traps that fail silently
+
+These are the ones that cost hours, because nothing reports an error:
+
+**1. `curl` is not curl.** In Windows PowerShell, `curl` is an alias for `Invoke-WebRequest`, which does not understand `-s` and returns an object rather than text. Always write **`curl.exe`** (present on every Windows 10/11 install), or use `Invoke-RestMethod`.
+
+**2. Piping a secret corrupts it.** PowerShell adds a UTF-16 or UTF-8 byte-order mark and a trailing CRLF, and all of it is stored *inside* the secret. The Gemini key then fails authentication with a confusing error, and the secret *looks* fine in the Console. Measured on a 16-character key:
+
+| How the key is written | Bytes stored | Damage |
+|---|---|---|
+| `$key \| Out-File f.txt` | **21** | BOM `ef bb bf` + CRLF |
+| `Set-Content f.txt $key` | **18** | trailing CRLF |
+| `Set-Content f.txt $key -Encoding utf8 -NoNewline` | **19** | BOM `ef bb bf` |
+| `[System.IO.File]::WriteAllText(f, $key, utf8NoBom)` | **16** | correct |
+
+`scripts\setup-secrets.ps1` uses the last form and prints the byte count so you can confirm it matches your key length.
+
+### Syntax translation
+
+| bash | PowerShell |
+|---|---|
+| `export FOO=bar` | `$FOO = "bar"` |
+| `$FOO` | `$FOO` (same) |
+| `\` at end of line | `` ` `` (backtick) |
+| `$(command)` | `$(command)` (same) |
+| `curl -s URL` | `curl.exe -s URL` |
+| `./script.sh` | `.\script.ps1` |
+| `printf '%s' "$K" \| gcloud … --data-file=-` | use `setup-secrets.ps1` (see trap 2) |
+
+> Windows PowerShell 5.1 has no `&&`, no `||`, and no ternary operator. Run commands on separate lines.
+
+### Step W1 — Install the tools
+
+1. **Google Cloud CLI** — [download the installer](https://cloud.google.com/sdk/docs/install#windows). Accept "Run gcloud init" at the end.
+2. **Node.js 20 or 22 LTS** — [nodejs.org](https://nodejs.org/).
+3. **Firebase CLI** — `npm install -g firebase-tools`
+
+Close and reopen PowerShell so `PATH` updates, then confirm:
+
+```powershell
+gcloud --version
+node --version
+firebase --version
+```
+
+If `gcloud` is not recognised after reinstalling, the installer did not update `PATH`. Add it manually:
+
+```powershell
+$env:PATH += ";$env:LOCALAPPDATA\Google\Cloud SDK\google-cloud-sdk\bin"
+```
+
+### Step W2 — Allow the setup script to run
+
+Windows blocks local scripts by default. This allows signed remote scripts and local ones, for the current user only:
+
+```powershell
+Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
+```
+
+If you would rather not change the policy at all, run the script one time with a bypass instead:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\setup-secrets.ps1 -ProjectId your-project-id
+```
+
+### Step W3 — Set your variables
+
+```powershell
+cd "$HOME\Desktop\true-train-neo-gcp"
+
+$PROJECT_ID   = "your-project-id"
+$REGION       = "asia-east1"
+$SERVICE_NAME = "truetrainneo"
+
+gcloud auth login
+gcloud config set project $PROJECT_ID
+```
+
+These variables live only in the current window. If you close PowerShell, set them again.
+
+### Step W4 — Firebase Console (browser)
+
+Identical to **Step 2** above — it is all point-and-click:
+
+1. [Firebase Console](https://console.firebase.google.com/) → add Firebase to the **same** GCP project.
+2. **Authentication → Get started**.
+3. **Sign-in method** → enable **Google**, and enable **Email/Password → Email link (passwordless)** with the Email/Password toggle itself left **off**.
+4. **Project settings → General → Your apps → Web app** → register and copy the four config values.
+
+Keep that config open — you need it in Step W7.
+
+### Step W5 — Firestore
+
+```powershell
+gcloud firestore databases create --location=$REGION
+
+firebase login
+firebase use $PROJECT_ID
+firebase deploy --only firestore:rules,firestore:indexes
+```
+
+Index builds take a few minutes. Deck pagination and study sessions return errors until they finish — check progress in **Firebase Console → Firestore → Indexes**.
+
+### Step W6 — Secrets and IAM
+
+Get a key from [Google AI Studio](https://aistudio.google.com/apikey), then:
+
+```powershell
+.\scripts\setup-secrets.ps1 -ProjectId $PROJECT_ID -GeminiApiKey "YOUR_KEY_HERE"
+```
+
+The script enables the APIs, creates the secret, uploads the key with correct byte-for-byte encoding, and grants the runtime service account `secretAccessor` **on that secret only**, plus `datastore.user` and `firebaseauth.admin`.
+
+Confirm the byte count it prints matches your key's length. If it does not, the key was mangled — re-run rather than deploying.
+
+### Step W7 — Deploy
+
+Backticks (`` ` ``) continue the line. Nothing may follow a backtick on the same line, not even a space.
+
+```powershell
+gcloud run deploy $SERVICE_NAME `
+  --source . `
+  --region $REGION `
+  --allow-unauthenticated `
+  --set-secrets="GEMINI_API_KEY=GEMINI_API_KEY:latest" `
+  --set-env-vars="NEXT_PUBLIC_FIREBASE_API_KEY=your-api-key" `
+  --set-env-vars="NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=$PROJECT_ID.firebaseapp.com" `
+  --set-env-vars="NEXT_PUBLIC_FIREBASE_PROJECT_ID=$PROJECT_ID" `
+  --set-env-vars="NEXT_PUBLIC_FIREBASE_APP_ID=your-app-id"
+```
+
+If backticks give you trouble, run it as one long line — it is the same command.
+
+First deploy takes 5–10 minutes (Cloud Build installs dependencies and builds the image). Later deploys are faster.
+
+> Uploads are governed by `.gcloudignore`, which excludes `node_modules` and `.env`. **Do not delete that file** — this repo is not a git repository, so without it gcloud uploads the entire folder, including your secrets.
+
+### Step W8 — Label for challenge verification
+
+```powershell
+gcloud run services update $SERVICE_NAME `
+  --update-labels=dev-tutorial=cloud-run-ai-challenge `
+  --region=asia-east1
+```
+
+### Step W9 — Authorize the domain, then verify
+
+```powershell
+$SERVICE_URL = gcloud run services describe $SERVICE_NAME --region $REGION --format="value(status.url)"
+Write-Host $SERVICE_URL
+```
+
+Copy that URL (without `https://`) into **Firebase Console → Authentication → Settings → Authorized domains**. Skip this and Google Sign-In fails with `auth/unauthorized-domain`.
+
+Then check readiness — note `curl.exe`, not `curl`:
+
+```powershell
+curl.exe -s "$SERVICE_URL/api/health"
+```
+
+Or, more idiomatically:
+
+```powershell
+Invoke-RestMethod "$SERVICE_URL/api/health" | ConvertTo-Json -Depth 5
+```
+
+Expect `ready: true` with `geminiKeySource: "secret-manager"`.
+
+### Step W10 — Running locally on Windows (optional)
+
+```powershell
+Copy-Item .env.local.example .env
+notepad .env                          # fill in the Firebase web config
+gcloud auth application-default login  # ADC for the Admin SDK
+npm install
+npm run dev
+```
+
+Open <http://localhost:3000>. `localhost` is already an authorized domain in Firebase by default.
+
+For local AI, add `GEMINI_API_KEY=your-key` to `.env`. Deployed environments read it from Secret Manager instead and leave this empty.
+
+### Windows troubleshooting
+
+| Symptom | Cause and fix |
+|---|---|
+| `gcloud : The term 'gcloud' is not recognized` | PowerShell opened before install finished. Close and reopen it, or add the SDK `bin` folder to `PATH` (Step W1). |
+| `cannot be loaded because running scripts is disabled` | Execution policy. See Step W2. |
+| `Invoke-WebRequest : A parameter cannot be found that matches parameter name 's'` | You used `curl` instead of `curl.exe`. |
+| Gemini calls fail but the secret looks correct in the Console | The key was written with a BOM or trailing newline. Re-upload with `setup-secrets.ps1` and check the printed byte count. |
+| Deploy uploads for many minutes, or fails on size | `.gcloudignore` is missing or was deleted. Restore it — `node_modules` is being uploaded. |
+| `auth/unauthorized-domain` in the browser | The Cloud Run domain is not in Firebase authorized domains. Step W9. |
+| `The query requires an index` | Index builds have not finished. Watch Firebase Console → Firestore → Indexes. |
+| `PERMISSION_DENIED` on Firestore from the server | Runtime service account is missing `roles/datastore.user`. Re-run `setup-secrets.ps1`. |
+| `ready: false`, `firebaseAdminCredentials: false` locally | ADC not set up. Run `gcloud auth application-default login`. |
+| Backtick continuation errors | Trailing whitespace after a backtick. Put the whole command on one line instead. |
+| `npm install` fails on a native module | Install the [VS Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/), or use Node 20/22 LTS rather than an odd-numbered release. |
 
 ---
 
@@ -447,9 +664,13 @@ lib/
   firestore/   types, paths, sanitizer, search tokens
   queries/     vocabulary, review, settings
 firestore.rules / firestore.indexes.json
-Dockerfile / .dockerignore
-scripts/setup-secrets.sh
+Dockerfile / .dockerignore / .gcloudignore
+scripts/
+  setup-secrets.sh                             secrets + IAM (bash)
+  setup-secrets.ps1                            secrets + IAM (Windows PowerShell)
 ```
+
+> `.gcloudignore` keeps `node_modules` and `.env` out of the Cloud Build upload. It is required rather than optional here, because gcloud only falls back to `.gitignore` inside a git repository and this project is not one.
 
 ## Scripts
 

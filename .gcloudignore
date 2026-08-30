@@ -1,0 +1,33 @@
+# Controls what `gcloud run deploy --source .` uploads to Cloud Build.
+#
+# This file is REQUIRED here. gcloud only falls back to .gitignore when the
+# directory is a git repository; this one is not, so without this file gcloud
+# would upload everything - including node_modules and .env.
+
+# Secrets and credentials must never reach a build context.
+.env
+.env.*
+*.pem
+*.key
+*-key.json
+*service-account*.json
+application_default_credentials.json
+
+# The image runs `npm ci` itself; uploading these wastes minutes and bandwidth.
+node_modules
+.next
+out
+build
+*.tsbuildinfo
+
+# Repo and editor noise.
+.git
+.gitignore
+.gcloudignore
+.github
+.vscode
+.idea
+.claude
+CLAUDE.md
+npm-debug.log*
+.DS_Store
