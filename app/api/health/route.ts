@@ -1,14 +1,14 @@
 import { NextResponse } from "next/server";
 import { adminAuth, adminDb } from "@/lib/firebase/admin";
 import { readFirebaseWebConfigFromEnv } from "@/lib/firebase/config";
+import { wordsPath } from "@/lib/firestore/paths";
 import { getGeminiApiKey } from "@/lib/ai/secrets";
 
-// Readiness probe. Every field is a boolean, a length, an error code, or the
-// project id, so this is safe to curl against a live URL.
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// Reported generically so an unexpected message cannot leak internals.
+const HEALTH_PROBE_UID = "healthProbeNoSuchUser";
+
 function errorCode(error: unknown): string {
   const code = (error as { code?: unknown })?.code;
   if (typeof code === "string") return code;
@@ -52,8 +52,6 @@ export async function GET() {
     console.error("health_admin_credentials_failed", error);
   }
 
-  // Separate permission from Firebase Auth: roles/datastore.user vs
-  // roles/firebaseauth.admin. Checking only Auth hides read failures.
   let firestoreRead = false;
   let firestoreError = "";
   try {
@@ -64,15 +62,23 @@ export async function GET() {
     console.error("health_firestore_read_failed", error);
   }
 
-  // FAILED_PRECONDITION here means the composite indexes are still building.
   let firestoreIndexes = false;
   let indexError = "";
   if (firestoreRead) {
     try {
-      const probe = adminDb().collectionGroup("words").where("deckId", "==", "__health_probe__");
+      const probe = adminDb()
+        .collection(wordsPath(HEALTH_PROBE_UID))
+        .where("deckId", "==", "health-probe");
       await Promise.all([
         probe.where("sm2.repetitions", ">=", 3).count().get(),
         probe.where("sm2.dueDate", "<=", "1970-01-01").count().get(),
+        probe.where("searchTokens", "array-contains", "probe").count().get(),
+        probe
+          .where("searchTokens", "array-contains", "probe")
+          .where("sm2.repetitions", ">=", 3)
+          .count()
+          .get(),
+        probe.where("sm2.dueDate", "<=", "1970-01-01").orderBy("sm2.dueDate").orderBy("createdAt").limit(1).get(),
         probe.orderBy("createdAt").limit(1).get(),
       ]);
       firestoreIndexes = true;
@@ -82,8 +88,6 @@ export async function GET() {
     }
   }
 
-  // Cloud Run injects --set-secrets values as ordinary environment variables,
-  // so "environment" is expected for both that and --set-env-vars.
   let geminiKeyLength = 0;
   let geminiSource: "none" | "environment" | "secret-manager-api" = "none";
   try {
