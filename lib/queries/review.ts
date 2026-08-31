@@ -200,7 +200,7 @@ export async function getStatsSummary(): Promise<StatsSummary> {
   const uid = requireUid();
   const logs = collection(getDb(), reviewLogsPath(uid));
 
-  const [decks, totalLogs, correctLogs] = await Promise.all([
+  const [{ decks }, totalLogs, correctLogs] = await Promise.all([
     getDecksWithStats(),
     getCountFromServer(query(logs)),
     getCountFromServer(query(logs, where("rating", ">=", 3))),

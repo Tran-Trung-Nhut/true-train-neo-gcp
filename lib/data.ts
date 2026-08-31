@@ -20,6 +20,9 @@ export interface Deck {
   total: number;
   learned: number;
   due: number;
+  /** False when the server could not read this deck's counts; totals are then
+   *  placeholders and must not be rendered as real numbers. */
+  statsAvailable: boolean;
 }
 
 export interface QuizOption {

@@ -129,7 +129,9 @@ service cloud.firestore {
 
 > The file in this repo is the authoritative version — it additionally type-checks each write. The block above is the same model in its shortest readable form.
 
-Composite indexes ship in `firestore.indexes.json` and are created by the deploy above. Index builds take a few minutes; deck pagination and study sessions return errors until they finish.
+Composite indexes ship in `firestore.indexes.json` and are created by the deploy above. Index builds take a few minutes; deck pagination and study sessions return errors until they finish, and the deck list shows its word counts as `—` rather than a wrong number.
+
+The `count()` aggregations behind the deck word/learned/due totals carry no `orderBy`, so each needs its **own** index ending in `__name__` — an index with a trailing `createdAt` will not serve them. That is why `firestore.indexes.json` declares both the two-field and three-field variants of the same field pairs.
 
 ### Step 4 — Secret Manager and IAM
 
@@ -356,7 +358,7 @@ firebase use $PROJECT_ID
 firebase deploy --only firestore:rules,firestore:indexes
 ```
 
-Index builds take a few minutes. Deck pagination and study sessions return errors until they finish — check progress in **Firebase Console → Firestore → Indexes**.
+Index builds take a few minutes. Deck pagination and study sessions return errors until they finish, and the deck list shows `—` in place of word counts — check progress in **Firebase Console → Firestore → Indexes**.
 
 ### Step W6 — Secrets and IAM
 

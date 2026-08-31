@@ -1,10 +1,16 @@
 import { NextResponse } from "next/server";
+import type { Query } from "firebase-admin/firestore";
 import { requireUser } from "@/lib/api/guard";
 import { adminDb } from "@/lib/firebase/admin";
 import { decksPath, wordsPath } from "@/lib/firestore/paths";
 import type { DeckDoc } from "@/lib/firestore/types";
 
 // Firestore has no GROUP BY, so per-deck totals use count() aggregations.
+//
+// Those aggregations carry no orderBy, so each one needs its own composite
+// index terminating in __name__ (see firestore.indexes.json). A count that
+// still fails must degrade to "stats unavailable" rather than a 500: the deck
+// names are already in hand and the list stays usable without the numbers.
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
@@ -24,37 +30,56 @@ export async function GET(request: Request) {
   const offsetMinutes = Number.isFinite(rawOffset) ? Math.max(-840, Math.min(840, rawOffset)) : 0;
   const today = localToday(offsetMinutes);
 
+  const failures: unknown[] = [];
+  const countOrNull = async (query: Query): Promise<number | null> => {
+    try {
+      return (await query.count().get()).data().count;
+    } catch (error) {
+      failures.push(error);
+      return null;
+    }
+  };
+
+  let deckSnapshot;
   try {
-    const db = adminDb();
-    const deckSnapshot = await db.collection(decksPath(uid)).orderBy("createdAt").get();
-    const words = db.collection(wordsPath(uid));
-
-    const rows = await Promise.all(
-      deckSnapshot.docs.map(async (deckDoc) => {
-        const deck = deckDoc.data() as DeckDoc;
-        const scoped = words.where("deckId", "==", deckDoc.id);
-
-        const [total, learned, due] = await Promise.all([
-          scoped.count().get(),
-          scoped.where("sm2.repetitions", ">=", 3).count().get(),
-          scoped.where("sm2.dueDate", "<=", today).count().get(),
-        ]);
-
-        return {
-          id: deckDoc.id,
-          name: deck.name ?? "",
-          category: deck.category ?? "",
-          description: deck.description ?? "",
-          total: total.data().count,
-          learned: learned.data().count,
-          due: due.data().count,
-        };
-      })
-    );
-
-    return NextResponse.json({ decks: rows });
+    deckSnapshot = await adminDb().collection(decksPath(uid)).orderBy("createdAt").get();
   } catch (error) {
-    console.error("deck_stats_failed", error);
+    // Without the deck list there is nothing to render, so this stays fatal.
+    console.error("deck_list_failed", error);
     return NextResponse.json({ error: "stats_failed" }, { status: 500 });
   }
+
+  const words = adminDb().collection(wordsPath(uid));
+
+  const rows = await Promise.all(
+    deckSnapshot.docs.map(async (deckDoc) => {
+      const deck = deckDoc.data() as DeckDoc;
+      const scoped = words.where("deckId", "==", deckDoc.id);
+
+      const [total, learned, due] = await Promise.all([
+        countOrNull(scoped),
+        countOrNull(scoped.where("sm2.repetitions", ">=", 3)),
+        countOrNull(scoped.where("sm2.dueDate", "<=", today)),
+      ]);
+
+      return {
+        id: deckDoc.id,
+        name: deck.name ?? "",
+        category: deck.category ?? "",
+        description: deck.description ?? "",
+        total: total ?? 0,
+        learned: learned ?? 0,
+        due: due ?? 0,
+        // The UI shows "—" instead of these zeroes when this is false, so a
+        // failed count is never presented as a real number.
+        statsAvailable: total !== null && learned !== null && due !== null,
+      };
+    })
+  );
+
+  if (failures.length > 0) {
+    console.error("deck_stats_partial", { failedCounts: failures.length }, failures[0]);
+  }
+
+  return NextResponse.json({ decks: rows, partial: failures.length > 0 });
 }

@@ -1,4 +1,4 @@
-import type { Word } from "../data";
+import type { Deck, Word } from "../data";
 import type { StudyOrder } from "../study-config";
 import type { WordFilter } from "../vocabulary-config";
 import type { OriginLanguage } from "../origin-language";
@@ -47,6 +47,14 @@ export interface DeckStatsRow {
   total: number;
   learned: number;
   due: number;
+  /** False when a count() aggregation failed, so the numbers are placeholders. */
+  statsAvailable?: boolean;
+}
+
+export interface DeckStatsResult {
+  decks: Deck[];
+  /** True when at least one deck's counts could not be read. */
+  partial: boolean;
 }
 
 export interface StatsSummary {

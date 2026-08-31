@@ -20,6 +20,7 @@ import { normalizePartOfSpeech } from "../part-of-speech";
 import { VOCABULARY_PAGE_SIZE } from "../vocabulary-config";
 import { dateString, mapStudyCard } from "./shared";
 import type {
+  DeckStatsResult,
   DeckStatsRow,
   DeckVocabularyPageInput,
   DeckVocabularyPageResult,
@@ -87,19 +88,23 @@ async function getJson<T>(url: string): Promise<T> {
 
 // ── Decks ─────────────────────────────────────────────────────────────
 
-export async function getDecksWithStats(): Promise<Deck[]> {
-  const data = await getJson<{ decks: DeckStatsRow[] }>(
+export async function getDecksWithStats(): Promise<DeckStatsResult> {
+  const data = await getJson<{ decks: DeckStatsRow[]; partial?: boolean }>(
     `/api/decks/stats?tzOffset=${timezoneOffset()}`
   );
-  return (data.decks ?? []).map((row): Deck => ({
-    id: row.id,
-    name: row.name,
-    level: row.category === "general" ? "General" : "Academic",
-    desc: row.description ?? "",
-    total: Number(row.total),
-    learned: Number(row.learned),
-    due: Number(row.due),
-  }));
+  return {
+    decks: (data.decks ?? []).map((row): Deck => ({
+      id: row.id,
+      name: row.name,
+      level: row.category === "general" ? "General" : "Academic",
+      desc: row.description ?? "",
+      total: Number(row.total),
+      learned: Number(row.learned),
+      due: Number(row.due),
+      statsAvailable: row.statsAvailable !== false,
+    })),
+    partial: data.partial === true,
+  };
 }
 
 export async function createDeck(input: CreateDeckInput) {

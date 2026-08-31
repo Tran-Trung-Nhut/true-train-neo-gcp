@@ -68,6 +68,7 @@ export const useStore = create<AppState>()(
   decks: [],
   decksLoading: false,
   decksError: "",
+  decksPartial: false,
   deckWords: [],
   deckWordsLoading: false,
   deckWordsTotal: 0,
@@ -194,8 +195,8 @@ export const useStore = create<AppState>()(
   loadDecks: async () => {
     set({ decksLoading: true });
     try {
-      const decks = await getDecksWithStats();
-      set({ decks, decksLoading: false, decksError: "" });
+      const { decks, partial } = await getDecksWithStats();
+      set({ decks, decksLoading: false, decksError: "", decksPartial: partial });
     } catch (error) {
       // A read failure must never render as "you have no decks" - that looks
       // like data loss and hides the real cause (permissions, missing index,

@@ -73,6 +73,8 @@ export interface AppState {
   decks: Deck[];
   decksLoading: boolean;
   decksError: string;
+  /** The decks loaded, but at least one deck's counts could not be read. */
+  decksPartial: boolean;
   deckWords: StudyCard[];
   deckWordsLoading: boolean;
   deckWordsTotal: number;

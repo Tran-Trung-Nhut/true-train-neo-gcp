@@ -9,6 +9,7 @@ export default function DeckIndex({ decks }: { decks: Deck[] }) {
   const openDeck = useStore((s) => s.openDeck);
   const openDeckModal = useStore((s) => s.openDeckModal);
   const decksError = useStore((s) => s.decksError);
+  const decksPartial = useStore((s) => s.decksPartial);
   const loadDecks = useStore((s) => s.loadDecks);
 
   return (
@@ -45,6 +46,39 @@ export default function DeckIndex({ decks }: { decks: Deck[] }) {
         </div>
       )}
 
+      {/* The decks themselves loaded; only their counts are missing. */}
+      {!decksError && decksPartial && (
+        <div
+          role="status"
+          style={{
+            padding: "14px 22px",
+            borderBottom: decks.length ? "1px solid var(--border)" : "none",
+            background: "color-mix(in srgb, var(--accent) 8%, transparent)",
+            ...mono(12),
+            color: "var(--muted)",
+            lineHeight: 1.5,
+          }}
+        >
+          Your decks loaded, but their word counts are temporarily unavailable. Nothing has been
+          lost — open a deck to see its words, or{" "}
+          <button
+            onClick={() => void loadDecks()}
+            style={{
+              background: "none",
+              border: "none",
+              padding: 0,
+              color: "var(--accent)",
+              ...mono(12, 600),
+              cursor: "pointer",
+              textDecoration: "underline",
+            }}
+          >
+            retry
+          </button>
+          .
+        </div>
+      )}
+
       {decks.length === 0 && !decksError && (
         <div style={{ padding: "26px 22px", textAlign: "center" }}>
           <div style={grotesk(17)}>No decks yet</div>
@@ -56,6 +90,7 @@ export default function DeckIndex({ decks }: { decks: Deck[] }) {
 
       {decks.map((d, i) => {
         const pct = d.total ? Math.round((d.learned / d.total) * 100) : 0;
+        const hasStats = d.statsAvailable !== false;
         return (
           <button
             key={d.id}
@@ -100,10 +135,10 @@ export default function DeckIndex({ decks }: { decks: Deck[] }) {
 
             <div className="deck-row-progress" style={{ width: 170 }}>
               <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
-                <span style={mono(12.5)}>
-                  {d.learned}/{d.total}
+                <span style={mono(12.5)}>{hasStats ? `${d.learned}/${d.total}` : "—/—"}</span>
+                <span style={{ ...mono(11), color: "var(--faint)" }}>
+                  {hasStats ? `${pct}%` : "count unavailable"}
                 </span>
-                <span style={{ ...mono(11), color: "var(--faint)" }}>{pct}%</span>
               </div>
               <div
                 style={{
@@ -114,15 +149,23 @@ export default function DeckIndex({ decks }: { decks: Deck[] }) {
                   overflow: "hidden",
                 }}
               >
-                <div style={{ width: `${pct}%`, height: "100%", background: "var(--accent)" }} />
+                <div
+                  style={{
+                    width: hasStats ? `${pct}%` : 0,
+                    height: "100%",
+                    background: "var(--accent)",
+                  }}
+                />
               </div>
             </div>
 
             <div style={{ width: 92, textAlign: "right" }}>
-              {d.due > 0 ? (
+              {!hasStats ? (
+                <span style={{ ...mono(12), color: "var(--faint)" }}>—</span>
+              ) : d.due > 0 ? (
                 <span style={{ ...mono(12), color: "var(--accent)" }}>{d.due} due</span>
               ) : (
-                <span style={{ ...mono(12), color: "var(--faint)" }}>— xong</span>
+                <span style={{ ...mono(12), color: "var(--faint)" }}>— done</span>
               )}
             </div>
 
