@@ -51,9 +51,6 @@ export function streakTier(streak: number): StreakTier {
   return STREAK_THRESHOLDS.find(({ minimum }) => streak >= minimum)?.tier ?? "starter";
 }
 
-// One review = one atomic batch: the SM-2 state on the word, an append-only
-// log entry, and the per-day counter that keeps the heatmap and streak cheap
-// to read. Either all three land or none do, so the UI can trust the result.
 export async function submitReview(
   card: StudyCard,
   rating: Rating,
@@ -154,9 +151,6 @@ export async function markPracticeCompleted(input: {
   return { increased: true, streak: summary.streak };
 }
 
-// Days with any activity: a completed practice session, or at least one review.
-// reviewCount is maintained by submitReview, so this reads at most `days` small
-// documents instead of scanning the whole review log.
 async function getActivePracticeDates(days: number): Promise<Set<string>> {
   const uid = requireUid();
   const snapshot = await getDocs(

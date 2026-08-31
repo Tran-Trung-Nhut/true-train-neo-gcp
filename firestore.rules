@@ -66,6 +66,30 @@ service cloud.firestore {
         allow delete: if false;
       }
 
+      // ── Chat conversations ───────────────────────────────────────────
+      // Owner-bound like everything else. Sizes are capped in rules as well as
+      // in the client, so a direct SDK call cannot store unbounded text under
+      // the account.
+      match /conversations/{conversationId} {
+        allow read, delete: if isOwner(userId);
+        allow create, update: if isOwner(userId)
+          && isNonEmptyString(request.resource.data.title, 120)
+          && request.resource.data.deckId is string
+          && request.resource.data.deckId.size() <= 128
+          && request.resource.data.messageCount is int
+          && request.resource.data.messageCount >= 0;
+
+        // Transcript turns are append-only: an edit would let stored text drift
+        // from what the model was actually asked and answered.
+        match /messages/{messageId} {
+          allow read, delete: if isOwner(userId);
+          allow create: if isOwner(userId)
+            && request.resource.data.role in ['ai', 'user']
+            && isNonEmptyString(request.resource.data.text, 4000);
+          allow update: if false;
+        }
+      }
+
       // ── AI quota: readable by the owner, writable only server-side ────
       match /aiUsage/{usageId} {
         allow read: if isOwner(userId);

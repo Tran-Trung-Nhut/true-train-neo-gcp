@@ -35,7 +35,17 @@ import {
   saveCurrentWord,
 } from "./store/word-actions";
 import { gradeWriting, loadWritingQuota } from "./store/writing-actions";
-import type { AppState, ChatMsg, Screen } from "./store/types";
+import {
+  chatSend,
+  freshChat,
+  loadConversations,
+  newConversation,
+  openConversation,
+  removeConversation,
+  retryChatSave,
+  setChatDeck,
+} from "./store/chat-actions";
+import type { AppState, Screen } from "./store/types";
 
 export type {
   ChatMsg,
@@ -76,6 +86,7 @@ export const useStore = create<AppState>()(
   studyDeckCards: [],
   studyCards: [],
   studyLoading: false,
+  studyExtraPractice: false,
   quizQuestions: [],
   quizSource: "local",
   aiQuizLoading: false,
@@ -128,15 +139,21 @@ export const useStore = create<AppState>()(
   practiceStreakPopup: null,
   qReviewPending: false,
 
-  chat: [
-    {
-      role: "ai",
-      text: "Hi! I am your English tutor. Start with any English sentence and I will chat with you and suggest fixes where useful.",
-    },
-  ],
+  chat: freshChat(),
   chatInput: "",
   aiTyping: false,
   chatError: "",
+  chatSaveError: "",
+  chatSaving: false,
+  chatLoading: false,
+  pendingTurn: null,
+  conversations: [],
+  conversationsLoading: false,
+  conversationsError: "",
+  activeConversationId: "",
+  chatListOpen: false,
+  chatDeckId: "",
+  chatDeckWords: [],
 
   writingTaskType: 1,
   writingImage: "",
@@ -398,6 +415,7 @@ export const useStore = create<AppState>()(
       aiQuizLoading: false,
       aiQuizError: "",
       aiQuizSimulated: false,
+      studyExtraPractice: false,
     });
     if (typeof window !== "undefined") window.scrollTo(0, 0);
     try {
@@ -405,11 +423,16 @@ export const useStore = create<AppState>()(
         const order = (STUDY_ORDER_KEYS.includes(get().order as StudyOrder)
           ? get().order
           : "sm2") as StudyOrder;
-        const { sessionCards, deckCards } = await getStudySession(id, order, get().sessionSize);
+        const { sessionCards, deckCards, extraPractice } = await getStudySession(
+          id,
+          order,
+          get().sessionSize
+        );
         set({
           studyDeckCards: deckCards,
           studyCards: sessionCards,
           studyLoading: false,
+          studyExtraPractice: extraPractice,
           quizQuestions: mode === "quiz"
             ? generateQuiz(sessionCards, get().sessionSize, deckCards)
             : [],
@@ -594,57 +617,14 @@ export const useStore = create<AppState>()(
       };
     }),
 
-  chatSend: async () => {
-    const state = get();
-    const text = state.chatInput.trim();
-    if (!text || state.aiTyping) return;
-    const history: ChatMsg[] = [...state.chat, { role: "user", text }];
-
-    // The input is cleared only once the request settles, so a failed send
-    // leaves the text in the box to retry.
-    set({ chat: history, aiTyping: true, chatError: "" });
-
-    try {
-      const res = await fetch("/api/ai/chat", {
-        method: "POST",
-        credentials: "same-origin",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ messages: history }),
-      });
-
-      if (res.status === 429) {
-        const d = await res.json().catch(() => ({ limit: 10 }));
-        set((s) => ({
-          chat: [
-            ...s.chat,
-            {
-              role: "ai",
-              text: `You have used all ${d.limit ?? 10} AI chat turns for today. Come back tomorrow!`,
-            },
-          ],
-          chatInput: "",
-          aiTyping: false,
-        }));
-        return;
-      }
-
-      if (!res.ok) throw new Error("chat_failed");
-
-      const d = await res.json();
-      set((s) => ({
-        chat: [...s.chat, { role: "ai", text: d.reply || "…" }],
-        chatInput: "",
-        aiTyping: false,
-      }));
-    } catch {
-      // Roll the pending turn back out and keep the text for a retry.
-      set((s) => ({
-        chat: s.chat.slice(0, -1),
-        chatError: "Could not reach the AI. Your message was kept — try again.",
-        aiTyping: false,
-      }));
-    }
-  },
+  chatSend: async () => chatSend(set, get),
+  loadConversations: async () => loadConversations(set),
+  newConversation: () => newConversation(set, get),
+  openConversation: async (id) => openConversation(id, set, get),
+  removeConversation: async (id) => removeConversation(id, set, get),
+  setChatDeck: async (deckId) => setChatDeck(deckId, set, get),
+  retryChatSave: async () => retryChatSave(set, get),
+  toggleChatList: () => set((s) => ({ chatListOpen: !s.chatListOpen })),
 
   setWritingImage: (dataUrl) => set({ writingImage: dataUrl, writingError: "" }),
   setWritingAnswer: (text) => set({ writingAnswer: text }),

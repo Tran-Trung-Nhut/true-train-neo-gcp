@@ -84,6 +84,25 @@ export interface ProfileDoc {
   updatedAt: string;
 }
 
+export interface ConversationDoc {
+  /** Derived from the first learner message, never model-authored. */
+  title: string;
+  /** Empty when the chat is not grounded in a deck. */
+  deckId: string;
+  deckName: string;
+  /** Denormalised for the list view, so rendering it reads one collection. */
+  lastMessage: string;
+  messageCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ChatMessageDoc {
+  role: "ai" | "user";
+  text: string;
+  createdAt: string;
+}
+
 export interface AiUsageDoc {
   kind: string;
   count: number;

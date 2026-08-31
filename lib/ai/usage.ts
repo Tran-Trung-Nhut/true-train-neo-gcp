@@ -4,8 +4,6 @@ import { aiUsageId, aiUsagePath } from "@/lib/firestore/paths";
 import type { AiKind } from "./config";
 export { AI_LIMITS } from "./config";
 
-// Per-user, per-day AI quota. firestore.rules blocks all client writes to
-// aiUsage, so the counter is only mutable here via the Admin SDK.
 
 function utcDateString(): string {
   return new Date().toISOString().slice(0, 10);
@@ -22,7 +20,6 @@ export async function getUsage(uid: string, kind: AiKind): Promise<number> {
   return typeof count === "number" ? count : 0;
 }
 
-// Atomic: two concurrent requests cannot both read N and write N+1.
 export async function bumpUsage(uid: string, kind: AiKind): Promise<void> {
   await usageRef(uid, kind).set(
     {
@@ -35,7 +32,6 @@ export async function bumpUsage(uid: string, kind: AiKind): Promise<void> {
   );
 }
 
-// Fails closed: an unreachable quota store must not grant unlimited calls.
 export async function checkQuota(
   uid: string,
   kind: AiKind,

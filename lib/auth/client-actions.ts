@@ -16,8 +16,6 @@ import { getFirebaseAuth } from "@/lib/firebase/client";
 
 const EMAIL_FOR_SIGN_IN = "ttn-email-for-sign-in";
 
-// Firebase error codes are stable identifiers; map them to fixed English copy
-// so nothing from the SDK is echoed straight into the UI.
 const ERROR_COPY: Record<string, string> = {
   "auth/popup-closed-by-user": "Sign-in window was closed before finishing.",
   "auth/cancelled-popup-request": "Sign-in was cancelled.",
@@ -43,8 +41,6 @@ function origin(): string {
   return process.env.NEXT_PUBLIC_SITE_URL ?? "";
 }
 
-// Trades the client-side Firebase user for the HttpOnly server session cookie.
-// Nothing is considered signed in until this resolves.
 export async function establishServerSession(user: User): Promise<void> {
   const idToken = await user.getIdToken(true);
   const res = await fetch("/api/auth/session", {
@@ -73,7 +69,6 @@ export async function signInWithGoogle(): Promise<void> {
   }
 }
 
-// Completes a Google redirect fallback. Returns true when a session was made.
 export async function completeRedirectSignIn(): Promise<boolean> {
   const auth = getFirebaseAuth();
   const result = await getRedirectResult(auth);
@@ -92,7 +87,6 @@ export async function sendEmailSignInLink(email: string): Promise<void> {
   try {
     window.localStorage.setItem(EMAIL_FOR_SIGN_IN, address);
   } catch {
-    // Private mode: the callback page asks for the address instead.
   }
 }
 
@@ -114,13 +108,10 @@ export async function completeEmailLinkSignIn(email: string, href: string): Prom
   try {
     window.localStorage.removeItem(EMAIL_FOR_SIGN_IN);
   } catch {
-    // Nothing cached; harmless.
   }
   await establishServerSession(credential.user);
 }
 
-// Clears the server session first (revoking refresh tokens), then the local one,
-// so a failed network call can never leave a live server session behind.
 export async function signOutEverywhere(): Promise<void> {
   try {
     await fetch("/api/auth/session", { method: "DELETE" });
@@ -129,8 +120,6 @@ export async function signOutEverywhere(): Promise<void> {
   }
 }
 
-// Updates the Firebase profile, then re-mints the session cookie so the
-// server-rendered shell picks up the new name on the next request.
 export async function updateDisplayName(displayName: string): Promise<string> {
   const name = displayName.trim().replace(/\s+/g, " ").slice(0, 40);
   if (!name) throw new Error("missing_display_name");
@@ -140,9 +129,6 @@ export async function updateDisplayName(displayName: string): Promise<string> {
 
   await updateProfile(user, { displayName: name });
 
-  // Best-effort: Firebase refuses to mint a session cookie from an ID token
-  // older than 5 minutes, so this succeeds just after sign-in and is expected
-  // to fail later. The profile write above is what matters.
   await establishServerSession(user).catch(() => {});
   return name;
 }

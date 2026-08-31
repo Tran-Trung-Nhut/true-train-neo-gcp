@@ -3,7 +3,13 @@
 import { useEffect } from "react";
 import { BookOpen, Target, X, Zap } from "lucide-react";
 import { useStore } from "@/lib/store";
-import { ghostBtn, grotesk, mono, panel } from "../shared/ui";
+import { STUDY_PICKER_MODES, type StudyPickerMode } from "@/lib/study-config";
+import { chipStyle, ghostBtn, grotesk, mono, panel } from "../shared/ui";
+
+const MODE_LABEL: Record<StudyPickerMode, string> = {
+  flashcard: "flashcards",
+  quiz: "quiz",
+};
 
 export default function StudyDeckPicker() {
   const mode = useStore((s) => s.studyPickerMode);
@@ -11,6 +17,7 @@ export default function StudyDeckPicker() {
   const decksLoading = useStore((s) => s.decksLoading);
   const close = useStore((s) => s.closeStudyPicker);
   const startStudy = useStore((s) => s.startStudy);
+  const setState = useStore((s) => s.set);
   const nav = useStore((s) => s.nav);
 
   useEffect(() => {
@@ -69,6 +76,17 @@ export default function StudyDeckPicker() {
               </div>
               <h2 style={{ ...grotesk(23), margin: "4px 0 0" }}>Which deck do you want to study?</h2>
               {decksLoading && <div style={{ ...mono(11), color: "var(--muted)", marginTop: 4 }}>updating your review schedule...</div>}
+              <div style={{ display: "flex", gap: 7, marginTop: 10, flexWrap: "wrap" }}>
+                {STUDY_PICKER_MODES.map((key) => (
+                  <button
+                    key={key}
+                    onClick={() => setState("studyPickerMode", key)}
+                    style={{ ...chipStyle(mode === key), padding: "6px 11px", fontSize: 11.5 }}
+                  >
+                    {MODE_LABEL[key]}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
           <button
@@ -94,11 +112,14 @@ export default function StudyDeckPicker() {
         {decks.length > 0 ? (
           <div style={{ display: "grid", gap: 10, marginTop: 20 }}>
             {decks.map((deck) => {
-              const available = deck.due > 0;
+              const due = deck.due > 0;
+              // A deck with nothing due is still practisable ahead of schedule.
+              // Only a genuinely empty deck has nothing to show.
+              const empty = deck.total === 0;
               return (
                 <button
                   key={deck.id}
-                  disabled={!available || decksLoading}
+                  disabled={empty || decksLoading}
                   onClick={() => {
                     close();
                     void startStudy(mode, deck.id);
@@ -112,13 +133,13 @@ export default function StudyDeckPicker() {
                     textAlign: "left",
                     borderRadius: 8,
                     border: "1px solid var(--border)",
-                    background: available ? "var(--panelHi)" : "var(--panel)",
+                    background: due ? "var(--panelHi)" : "var(--panel)",
                     color: "var(--text)",
-                    cursor: available && !decksLoading ? "pointer" : "default",
-                    opacity: available && !decksLoading ? 1 : 0.62,
+                    cursor: !empty && !decksLoading ? "pointer" : "default",
+                    opacity: !empty && !decksLoading ? 1 : 0.62,
                   }}
                 >
-                  <span style={{ color: available ? "var(--accent)" : "var(--faint)", display: "inline-flex" }}>
+                  <span style={{ color: due ? "var(--accent)" : "var(--faint)", display: "inline-flex" }}>
                     <BookOpen size={18} />
                   </span>
                   <span style={{ flex: 1, minWidth: 0 }}>
@@ -126,7 +147,11 @@ export default function StudyDeckPicker() {
                       {deck.name}
                     </span>
                     <span style={{ ...mono(11.5), color: "var(--muted)", display: "block", marginTop: 3 }}>
-                      {deck.total} words - {deck.learned} learned
+                      {empty
+                        ? "no words yet - add some first"
+                        : due
+                          ? `${deck.total} words - ${deck.learned} learned`
+                          : `${deck.total} words - practise ahead of schedule`}
                     </span>
                   </span>
                   <span
@@ -135,11 +160,11 @@ export default function StudyDeckPicker() {
                       flex: "none",
                       padding: "5px 8px",
                       borderRadius: 6,
-                      color: available ? "var(--accent)" : "var(--muted)",
-                      background: available ? "color-mix(in srgb, var(--accent) 10%, var(--panel))" : "var(--track)",
+                      color: due ? "var(--accent)" : "var(--muted)",
+                      background: due ? "color-mix(in srgb, var(--accent) 10%, var(--panel))" : "var(--track)",
                     }}
                   >
-                    {available ? `${deck.due} due` : "done for today"}
+                    {empty ? "empty" : due ? `${deck.due} due` : "done for today"}
                   </span>
                 </button>
               );

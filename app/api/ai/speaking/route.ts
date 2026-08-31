@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server";
 import { readJsonBody, requireUser } from "@/lib/api/guard";
 import { AI_LIMITS } from "@/lib/ai/config";
-import { fenceUntrusted, getOriginLanguage, languageName } from "@/lib/ai/context";
+import {
+  fenceUntrusted,
+  getOriginLanguage,
+  languageName,
+  stripMarkdownEmphasis,
+} from "@/lib/ai/context";
 import {
   buildConversationSystemPrompt,
   type ConversationWordContext,
@@ -107,14 +112,16 @@ export async function POST(request: Request) {
   }));
 
   try {
+    // Same truncation trap as /api/ai/chat, worse: 260 tokens is below what the
+    // model spends on reasoning alone, leaving nothing for the reply.
     const result = await generateContentWithFallback(contents, {
       system: systemPrompt,
-      maxTokens: 260,
+      maxTokens: 2048,
       temperature: 0.78,
     });
     await bumpUsage(uid, "speaking");
     return NextResponse.json({
-      reply: result.text.trim(),
+      reply: stripMarkdownEmphasis(result.text).trim(),
       remaining: Math.max(0, limit - quota.used - 1),
     });
   } catch (error) {

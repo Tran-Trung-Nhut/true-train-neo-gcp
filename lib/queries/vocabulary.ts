@@ -170,6 +170,8 @@ export async function getDeckPool(
 export interface StudySession {
   sessionCards: StudyCard[];
   deckCards: StudyCard[];
+  /** True when nothing was due and the session was filled ahead of schedule. */
+  extraPractice: boolean;
 }
 
 export async function getStudySession(
@@ -199,9 +201,6 @@ export async function getDeckVocabularyPage(
   return getJson<DeckVocabularyPageResult>(`/api/decks/words?${params.toString()}`);
 }
 
-// Duplicate detection is scoped to the same headword, then narrowed in memory
-// on the normalised part of speech + definition, matching the previous
-// behaviour without needing a composite index per comparison field.
 export async function findExistingWord(
   word: string,
   partOfSpeech: string | undefined,

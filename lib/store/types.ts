@@ -1,6 +1,7 @@
 import type { OriginLanguage } from "../origin-language";
 import type { Deck, QuizQuestion } from "../data";
 import type {
+  ConversationSummary,
   DeckVocabularyPageInput,
   PracticeStreakSummary,
   StatsSummary,
@@ -58,6 +59,13 @@ export interface EnrichResult extends EnrichChoice {
   candidates: EnrichChoice[];
 }
 
+/** A completed exchange that reached the screen but not yet the database. */
+export interface PendingTurn {
+  conversationId: string;
+  userText: string;
+  aiText: string;
+}
+
 export interface ToastState {
   id: number;
   text: string;
@@ -82,6 +90,8 @@ export interface AppState {
   studyDeckCards: StudyCard[];
   studyCards: StudyCard[];
   studyLoading: boolean;
+  /** Nothing was due, so this session was drawn ahead of schedule. */
+  studyExtraPractice: boolean;
   quizQuestions: QuizQuestion[];
   quizSource: "local" | "ai";
   aiQuizLoading: boolean;
@@ -133,6 +143,20 @@ export interface AppState {
   chatInput: string;
   aiTyping: boolean;
   chatError: string;
+  /** The transcript is on screen but not yet stored; see chatSaveError. */
+  chatSaveError: string;
+  chatSaving: boolean;
+  chatLoading: boolean;
+  pendingTurn: PendingTurn | null;
+  conversations: ConversationSummary[];
+  conversationsLoading: boolean;
+  conversationsError: string;
+  /** Empty until the first message is sent in a brand-new conversation. */
+  activeConversationId: string;
+  chatListOpen: boolean;
+  /** Deck the current conversation is grounded in; empty means general chat. */
+  chatDeckId: string;
+  chatDeckWords: StudyCard[];
   writingTaskType: WritingTaskType;
   writingImage: string;
   writingAnswer: string;
@@ -199,6 +223,13 @@ export interface AppState {
   setAiQuizQuestionCount: (count: number) => void;
   toggleAiQuizType: (type: AiQuizType) => void;
   chatSend: () => void;
+  loadConversations: () => Promise<void>;
+  newConversation: () => void;
+  openConversation: (id: string) => Promise<void>;
+  removeConversation: (id: string) => Promise<void>;
+  setChatDeck: (deckId: string) => Promise<void>;
+  retryChatSave: () => Promise<void>;
+  toggleChatList: () => void;
   setWritingImage: (dataUrl: string) => void;
   setWritingAnswer: (text: string) => void;
   setWritingTaskType: (taskType: WritingTaskType) => void;

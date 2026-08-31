@@ -1,9 +1,5 @@
 import { SecretManagerServiceClient } from "@google-cloud/secret-manager";
 
-// Resolution order: GEMINI_API_KEY from the environment (Cloud Run secret
-// injection or local dev), then Secret Manager via ADC. Cached in module scope
-// so Secret Manager is read once per cold start.
-
 if (typeof window !== "undefined") {
   throw new Error("lib/ai/secrets must never be imported in client code");
 }
@@ -34,7 +30,6 @@ export async function accessSecret(
   return response.payload?.data?.toString() ?? "";
 }
 
-// A NEXT_PUBLIC_ prefix would inline the key into the client bundle.
 function assertKeyNotPublic(): void {
   for (const name of Object.keys(process.env)) {
     if (name.startsWith("NEXT_PUBLIC_") && /GEMINI|GENAI|GOOGLE_AI/i.test(name)) {
@@ -56,7 +51,6 @@ async function resolveGeminiApiKey(): Promise<string> {
   try {
     return (await accessSecret(secretId)).trim();
   } catch (error) {
-    // Routes degrade to their non-AI path rather than returning 500.
     console.error("gemini_secret_unavailable", error);
     return "";
   }
@@ -65,7 +59,7 @@ async function resolveGeminiApiKey(): Promise<string> {
 export function getGeminiApiKey(): Promise<string> {
   if (!cached) {
     cached = resolveGeminiApiKey().catch((error) => {
-      cached = null; // never cache a failure
+      cached = null; 
       throw error;
     });
   }

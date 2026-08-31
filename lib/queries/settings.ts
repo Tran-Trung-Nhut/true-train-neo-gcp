@@ -47,8 +47,6 @@ export async function saveUserSettings(settings: UserSettings): Promise<void> {
     { merge: true }
   );
 
-  // Mirrored onto the profile so server routes can read the learner's language
-  // for AI prompts without loading the whole settings document.
   await setDoc(
     doc(getDb(), userPath(uid)),
     stripUndefined({ originLanguage, updatedAt: new Date().toISOString() }),
@@ -56,8 +54,6 @@ export async function saveUserSettings(settings: UserSettings): Promise<void> {
   );
 }
 
-// Profile name lives on the Firebase user record and is mirrored to the
-// profile document so the server shell can render it after a reload.
 export async function saveDisplayName(displayName: string): Promise<string> {
   const name = await updateDisplayName(displayName);
   const uid = requireUid();

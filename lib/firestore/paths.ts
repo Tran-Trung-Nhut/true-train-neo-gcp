@@ -8,6 +8,9 @@ export const reviewLogsPath = (uid: string) => `users/${uid}/reviewLogs`;
 export const dailyStatsPath = (uid: string) => `users/${uid}/dailyStats`;
 export const settingsPath = (uid: string) => `users/${uid}/settings`;
 export const aiUsagePath = (uid: string) => `users/${uid}/aiUsage`;
+export const conversationsPath = (uid: string) => `users/${uid}/conversations`;
+export const conversationMessagesPath = (uid: string, conversationId: string) =>
+  `users/${uid}/conversations/${conversationId}/messages`;
 
 export const SETTINGS_DOC = "preferences";
 

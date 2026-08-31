@@ -48,15 +48,28 @@ export async function GET(request: Request) {
     const db = adminDb();
     const words = db.collection(wordsPath(uid)).where("deckId", "==", deckId);
 
-    const [dueSnapshot, poolSnapshot] = await Promise.all([
+    const drawSize = order === "sm2" ? sessionSize : DUE_POOL_SIZE;
+
+    let [dueSnapshot, poolSnapshot] = await Promise.all([
       words
         .where("sm2.dueDate", "<=", today)
         .orderBy("sm2.dueDate")
         .orderBy("createdAt")
-        .limit(order === "sm2" ? sessionSize : DUE_POOL_SIZE)
+        .limit(drawSize)
         .get(),
       words.orderBy("createdAt").limit(DISTRACTOR_POOL_SIZE).get(),
     ]);
+
+    // Nothing scheduled must not mean "you cannot practise". Fall back to the
+    // soonest-due cards so the deck is always reviewable ahead of time, and
+    // tell the client so it can label the session honestly rather than
+    // implying these cards were due. Reuses the (deckId, sm2.dueDate,
+    // createdAt) index — no filter, same ordering.
+    let extraPractice = false;
+    if (dueSnapshot.empty) {
+      dueSnapshot = await words.orderBy("sm2.dueDate").orderBy("createdAt").limit(drawSize).get();
+      extraPractice = !dueSnapshot.empty;
+    }
 
     let due: StudyCard[] = dueSnapshot.docs.map((doc) =>
       mapStudyCard(doc.id, doc.data() as WordDoc)
@@ -79,7 +92,11 @@ export async function GET(request: Request) {
       byId.set(doc.id, mapStudyCard(doc.id, doc.data() as WordDoc));
     }
 
-    return NextResponse.json({ sessionCards, deckCards: [...byId.values()] });
+    return NextResponse.json({
+      sessionCards,
+      deckCards: [...byId.values()],
+      extraPractice,
+    });
   } catch (error) {
     console.error("study_session_failed", error);
     return NextResponse.json({ error: "session_failed" }, { status: 500 });

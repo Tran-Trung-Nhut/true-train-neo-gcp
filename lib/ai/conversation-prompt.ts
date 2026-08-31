@@ -10,7 +10,6 @@ export interface ConversationPromptContext {
   deckName?: string;
   deckLevel?: string;
   voiceMode?: boolean;
-  /** English name of the learner's own language, e.g. "Vietnamese". */
   originLanguage?: string;
   targetWords?: ConversationWordContext[];
 }

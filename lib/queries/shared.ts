@@ -20,8 +20,6 @@ export function deriveWordStatus(sm2?: Sm2State | null): WordStatus {
   return sm2.repetitions >= 3 ? "learned" : "learning";
 }
 
-// reviewId stays null until the first review, which is what isCardDue() uses
-// to treat a never-reviewed word as due.
 export function mapStudyCard(id: string, row: WordDoc): StudyCard {
   const sm2 = row.sm2;
   return {

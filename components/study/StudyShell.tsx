@@ -21,6 +21,7 @@ export default function StudyShell() {
   const activeDeckId = useStore((s) => s.activeDeckId);
   const decks = useStore((s) => s.decks);
   const studyCount = useStore((s) => s.studyCards.length);
+  const extraPractice = useStore((s) => s.studyExtraPractice);
   const nav = useStore((s) => s.nav);
   const toggleTheme = useStore((s) => s.toggleTheme);
   const startStudy = useStore((s) => s.startStudy);
@@ -126,6 +127,26 @@ export default function StudyShell() {
               </button>
             ))}
           </div>
+
+          {/* These cards were not due; say so rather than letting the session
+              look like scheduled review. */}
+          {extraPractice && (screen === "flashcard" || screen === "quiz") && (
+            <div
+              style={{
+                ...panel,
+                marginTop: 16,
+                padding: "12px 14px",
+                background: "color-mix(in srgb, var(--accent) 8%, var(--panel))",
+                borderColor: "color-mix(in srgb, var(--accent) 30%, var(--border))",
+              }}
+            >
+              <div style={{ ...mono(11.5, 600), color: "var(--accent)" }}>extra practice</div>
+              <div style={{ ...mono(11.5), color: "var(--muted)", marginTop: 5, lineHeight: 1.5 }}>
+                Nothing is due in this deck today. These cards are being reviewed early — your
+                schedule still counts them.
+              </div>
+            </div>
+          )}
 
           {screen === "flashcard" && (
             <div className="session-card" style={{ ...panel, marginTop: 26, padding: 18 }}>

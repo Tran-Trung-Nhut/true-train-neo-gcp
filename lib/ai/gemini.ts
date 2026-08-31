@@ -1,8 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 import { getGeminiApiKey } from "./secrets";
 
-// Server-only Gemini client. Every call walks the model ladder so a transient
-// upstream failure costs latency rather than the user's work.
 
 if (typeof window !== "undefined") {
   throw new Error("lib/ai/gemini must never be imported in client code");
@@ -15,7 +13,6 @@ export const MODEL_LADDER = [
   "gemini-3.7-flash",       // deep reasoning fallback
 ] as const;
 
-// 401/403 are deliberately absent: they fail identically on every model.
 const RECOVERABLE_STATUS = new Set([429, 500, 503, 404]);
 
 const RECOVERABLE_PATTERNS = [
@@ -82,17 +79,34 @@ export interface GenerateOptions {
 
 export interface GenerateResult {
   text: string;
-  /** Which rung of the ladder answered. */
   model: string;
+  truncated: boolean;
 }
 
-// Walks MODEL_LADDER, surfacing an error only after every model has been tried.
+const SENTENCE_KEEP_RATIO = 0.6;
+
+function trimToLastSentence(text: string): string {
+  const trimmed = text.trim();
+  const lastEnd = Math.max(
+    trimmed.lastIndexOf("."),
+    trimmed.lastIndexOf("!"),
+    trimmed.lastIndexOf("?"),
+    trimmed.lastIndexOf("…")
+  );
+
+  if (lastEnd > 0 && lastEnd + 1 >= trimmed.length * SENTENCE_KEEP_RATIO) {
+    return trimmed.slice(0, lastEnd + 1);
+  }
+  return trimmed.endsWith("…") ? trimmed : `${trimmed}…`;
+}
+
 export async function generateContentWithFallback(
   contents: GeminiTurn[],
   options: GenerateOptions = {}
 ): Promise<GenerateResult> {
   const ai = await getClient();
   let lastError: unknown = null;
+  let bestPartial: { text: string; model: string } | null = null;
 
   for (const model of MODEL_LADDER) {
     try {
@@ -109,11 +123,20 @@ export async function generateContentWithFallback(
 
       const text = response.text ?? "";
       if (!text.trim()) {
-        // Empty body (safety block, truncation) is worth one more rung.
         lastError = new Error(`empty_response_from_${model}`);
         continue;
       }
-      return { text, model };
+
+      if (response.candidates?.[0]?.finishReason === "MAX_TOKENS") {
+        console.warn(`gemini_truncated model=${model} chars=${text.length}`);
+        if (!bestPartial || text.length > bestPartial.text.length) {
+          bestPartial = { text, model };
+        }
+        lastError = new Error(`truncated_response_from_${model}`);
+        continue;
+      }
+
+      return { text, model, truncated: false };
     } catch (error) {
       lastError = error;
       if (!isRecoverable(error)) {
@@ -122,6 +145,15 @@ export async function generateContentWithFallback(
       }
       console.warn(`gemini_retry model=${model} status=${statusOf(error)}`);
     }
+  }
+
+  if (bestPartial && !options.json) {
+    console.warn(`gemini_returning_partial model=${bestPartial.model}`);
+    return {
+      text: trimToLastSentence(bestPartial.text),
+      model: bestPartial.model,
+      truncated: true,
+    };
   }
 
   console.error("gemini_all_models_failed", lastError);
