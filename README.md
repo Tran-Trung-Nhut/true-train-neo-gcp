@@ -115,6 +115,17 @@ service cloud.firestore {
         allow update, delete: if false;
       }
 
+      // Chat transcripts. Turns are append-only, so stored text cannot drift
+      // from what the model was actually asked and answered.
+      match /conversations/{conversationId} {
+        allow read, write: if isOwner(userId);
+
+        match /messages/{messageId} {
+          allow read, create, delete: if isOwner(userId);
+          allow update: if false;
+        }
+      }
+
       // AI quota: readable by the owner, writable only by the Admin SDK.
       match /aiUsage/{usageId} {
         allow read: if isOwner(userId);
